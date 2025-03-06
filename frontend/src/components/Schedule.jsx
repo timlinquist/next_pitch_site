@@ -22,60 +22,26 @@ const Schedule = () => {
                     },
                 });
                 
-                console.log('Response status:', response.status);
-                console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-                
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Error response:', errorText);
-                    throw new Error(`Failed to fetch schedule entries: ${response.status} - ${errorText}`);
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
                 const data = await response.json();
-                console.log('Fetched data:', JSON.stringify(data, null, 2));
+                console.log('Received data:', data);
                 
-                if (!Array.isArray(data)) {
-                    throw new Error('Received invalid data format from server');
-                }
+                const formattedEvents = data.map(entry => ({
+                    id: entry.id,
+                    title: entry.title,
+                    start: entry.start_time,
+                    end: entry.end_time,
+                    description: entry.description
+                }));
                 
-                // Transform the data to match FullCalendar's event format
-                const calendarEvents = data.map(entry => {
-                    try {
-                        // Parse the dates and adjust for timezone
-                        const startDate = new Date(entry.start_time);
-                        const endDate = new Date(entry.end_time);
-                        
-                        // Log the parsed dates for debugging
-                        console.log('Event:', entry.title);
-                        console.log('Raw start:', entry.start_time);
-                        console.log('Parsed start:', startDate.toISOString());
-                        console.log('Raw end:', entry.end_time);
-                        console.log('Parsed end:', endDate.toISOString());
-                        
-                        return {
-                            id: entry.id,
-                            title: entry.title,
-                            description: entry.description,
-                            start: startDate.toISOString(),
-                            end: endDate.toISOString(),
-                            backgroundColor: '#4CAF50',
-                            borderColor: '#4CAF50',
-                            extendedProps: {
-                                description: entry.description
-                            }
-                        };
-                    } catch (err) {
-                        console.error('Error processing event:', entry, err);
-                        return null;
-                    }
-                }).filter(Boolean); // Remove any null entries from failed parsing
-                
-                console.log('Transformed events:', JSON.stringify(calendarEvents, null, 2));
-                setEvents(calendarEvents);
+                setEvents(formattedEvents);
+                setLoading(false);
             } catch (err) {
                 console.error('Error fetching schedule:', err);
                 setError(err.message);
-            } finally {
                 setLoading(false);
             }
         };
@@ -83,25 +49,12 @@ const Schedule = () => {
         fetchScheduleEntries();
     }, []);
 
-    const handleEventClick = (info) => {
-        const event = info.event;
-        alert(`
-Event: ${event.title}
-Time: ${event.start.toLocaleString()} - ${event.end.toLocaleString()}
-Description: ${event.extendedProps.description || 'No description available'}
-        `);
-    };
-
-    const handleEventsSet = (events) => {
-        console.log('FullCalendar received events:', events);
-    };
-
     if (loading) {
-        return <div className="container">Loading schedule...</div>;
+        return <div className="container">Loading...</div>;
     }
 
     if (error) {
-        return <div className="container">Error: {error}</div>;
+        return <div className="container">Error loading schedule</div>;
     }
 
     return (
@@ -110,7 +63,6 @@ Description: ${event.extendedProps.description || 'No description available'}
                 <h1>Schedule a Consultation</h1>
                 <p>View our availability and schedule a consultation to discuss your pitch needs. We offer flexible scheduling options to accommodate your timeline.</p>
             </div>
-
             <div className="calendar-container">
                 <FullCalendar
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -121,25 +73,10 @@ Description: ${event.extendedProps.description || 'No description available'}
                         right: 'dayGridMonth,timeGridWeek,timeGridDay'
                     }}
                     events={events}
-                    eventClick={handleEventClick}
-                    eventsSet={handleEventsSet}
-                    slotMinTime="09:00:00"
-                    slotMaxTime="17:00:00"
-                    allDaySlot={false}
-                    weekends={false}
-                    height="auto"
-                    stickyHeaderDates={false}
-                    expandRows={true}
-                    handleWindowResize={true}
-                    timeZone="local"
-                    displayEventTime={true}
-                    displayEventEnd={true}
-                    eventTimeFormat={{
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        meridiem: false,
-                        hour12: false
+                    eventClick={(info) => {
+                        alert(`Event: ${info.event.title}\nDescription: ${info.event.extendedProps.description}`);
                     }}
+                    timeZone="local"
                     initialDate={new Date()}
                 />
             </div>
