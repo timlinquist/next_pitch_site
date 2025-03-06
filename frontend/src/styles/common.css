@@ -288,4 +288,109 @@ p {
 
 .btn-secondary:hover {
     background-color: #5a6268;
+}
+
+.event-details-modal {
+    position: relative;
+    max-width: 500px;
+    width: 90%;
+}
+
+.event-details-modal .close-button {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.event-details-modal .close-button:hover {
+    color: #333;
+}
+
+.event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-right: 2rem;
+}
+
+.event-header h2 {
+    margin: 0;
+    color: #333;
+}
+
+.delete-button {
+    background: none;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+    padding: 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.delete-button:hover {
+    color: #c82333;
+}
+
+.event-time {
+    margin-bottom: 1.5rem;
+}
+
+.event-time p {
+    margin: 0.5rem 0;
+    color: #666;
+}
+
+.event-description {
+    color: #333;
+}
+
+.event-description p {
+    margin: 0.5rem 0;
+    line-height: 1.5;
+}
+
+.delete-confirmation {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #eee;
+}
+
+.delete-confirmation p {
+    margin-bottom: 1rem;
+    color: #dc3545;
+    font-weight: 500;
+}
+
+.confirmation-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+.alert {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.alert-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
 } 

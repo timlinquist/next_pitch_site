@@ -129,9 +129,6 @@ describe('Schedule Component', () => {
             json: () => Promise.resolve(mockEvents)
         });
 
-        // Mock window.alert
-        const mockAlert = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
         await act(async () => {
             render(<Schedule />);
         });
@@ -144,12 +141,11 @@ describe('Schedule Component', () => {
         const event = screen.getByText('Team Standup');
         await userEvent.click(event);
 
-        // Verify alert was called with correct information
-        expect(mockAlert).toHaveBeenCalledWith(
-            expect.stringContaining('Team Standup')
-        );
-
-        mockAlert.mockRestore();
+        // Verify modal is opened with correct event details
+        expect(screen.getByRole('heading', { name: 'Team Standup' })).toBeInTheDocument();
+        expect(screen.getByText('Daily team sync meeting')).toBeInTheDocument();
+        expect(screen.getByText(/Start:/)).toBeInTheDocument();
+        expect(screen.getByText(/End:/)).toBeInTheDocument();
     });
 
     it('opens modal when clicking on calendar', async () => {
