@@ -9,7 +9,6 @@ const Schedule = () => {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [initialDate, setInitialDate] = useState(null);
 
     useEffect(() => {
         const fetchScheduleEntries = async () => {
@@ -37,12 +36,6 @@ const Schedule = () => {
                 
                 if (!Array.isArray(data)) {
                     throw new Error('Received invalid data format from server');
-                }
-                
-                // Set initial date based on first event
-                if (data.length > 0) {
-                    const firstEventDate = new Date(data[0].start_time);
-                    setInitialDate(firstEventDate);
                 }
                 
                 // Transform the data to match FullCalendar's event format
@@ -138,7 +131,7 @@ Description: ${event.extendedProps.description || 'No description available'}
                     stickyHeaderDates={false}
                     expandRows={true}
                     handleWindowResize={true}
-                    timeZone="UTC"
+                    timeZone="local"
                     displayEventTime={true}
                     displayEventEnd={true}
                     eventTimeFormat={{
@@ -147,7 +140,7 @@ Description: ${event.extendedProps.description || 'No description available'}
                         meridiem: false,
                         hour12: false
                     }}
-                    initialDate={initialDate}
+                    initialDate={new Date()}
                 />
             </div>
         </div>
