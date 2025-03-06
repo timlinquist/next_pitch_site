@@ -1,4 +1,4 @@
-module your_project
+module nextpitch.com/backend
 
 go 1.21.0
 
