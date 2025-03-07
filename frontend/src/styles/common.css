@@ -140,6 +140,21 @@ p {
     color: #666;
 }
 
+.service-card .duration {
+    font-size: 1rem;
+    color: #666;
+    margin: -0.5rem 0 1rem;
+    font-style: italic;
+}
+
+.service-card .description {
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    text-align: left;
+    min-height: 180px;
+}
+
 /* Contact section styles */
 .contact-grid {
     display: grid;
