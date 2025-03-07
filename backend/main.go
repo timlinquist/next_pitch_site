@@ -35,6 +35,12 @@ func main() {
 	scheduleController := controllers.NewScheduleController()
 	contactController := controllers.NewContactController()
 
+	videoController, err := controllers.NewVideoController()
+	if err != nil {
+		fmt.Printf("Error initializing video controller: %v\n", err)
+		os.Exit(1)
+	}
+
 	// API routes
 	r.GET("/api/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
@@ -48,6 +54,9 @@ func main() {
 
 	// Contact form submission
 	r.POST("/api/contact", contactController.SendEmail)
+
+	// Video upload route
+	r.POST("/api/video/upload", videoController.UploadVideo)
 
 	// Serve static files from frontend directory
 	r.Static("/static", "../frontend")
