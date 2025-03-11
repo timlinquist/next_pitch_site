@@ -25,14 +25,11 @@ const Services = () => {
                 <div className="service-card">
                     <h3>Mechanical Analysis</h3>
                     <div className="price">$300</div>
+                    <p className="duration">&nbsp;</p>
                     <p className="description">
-                        Submit your pitching footage for a detailed video analysis that will transform your technique. 
-                        You'll receive a comprehensive review including custom-tailored drills, a targeted strength program, 
-                        and specific mobility exercises designed to address your mechanical inefficiencies. Includes a 
-                        detailed feedback report and follow-up consultation to ensure you're implementing the 
-                        recommendations effectively.
+                        Get a detailed mechanical analysis of your pitching motion. Upload two videos: one from the front view and one from the side view. Our experts will analyze your mechanics and provide a comprehensive report with actionable insights.
                     </p>
-                    <a href="/schedule" className="btn">Book Now</a>
+                    <a href="/mechanical-analysis" className="btn">Upload Now</a>
                 </div>
 
                 <div className="service-card">

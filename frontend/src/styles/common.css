@@ -116,6 +116,9 @@ p {
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    min-height: 500px;
 }
 
 .service-card h3 {
@@ -127,17 +130,6 @@ p {
     color: #007bff;
     margin-bottom: 1.5rem;
     font-weight: bold;
-}
-
-.service-card ul {
-    list-style: none;
-    padding: 0;
-    margin-bottom: 1.5rem;
-}
-
-.service-card li {
-    margin-bottom: 0.5rem;
-    color: #666;
 }
 
 .service-card .duration {
@@ -152,7 +144,12 @@ p {
     line-height: 1.6;
     margin-bottom: 1.5rem;
     text-align: left;
-    min-height: 180px;
+    flex-grow: 1;
+}
+
+.service-card .btn {
+    align-self: center;
+    margin-top: auto;
 }
 
 /* Contact section styles */

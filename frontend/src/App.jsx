@@ -6,6 +6,7 @@ import About from './components/About.jsx'
 import Services from './components/Services.jsx'
 import Schedule from './components/Schedule.jsx'
 import Contact from './components/Contact.jsx'
+import MechanicalAnalysisPage from './pages/MechanicalAnalysisPage.jsx'
 import './styles/nav.css'
 import './styles/common.css'
 import './App.css'
@@ -21,6 +22,7 @@ function App() {
           <Route path="/services" element={<Services />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/mechanical-analysis" element={<MechanicalAnalysisPage />} />
         </Routes>
       </div>
     </Router>
