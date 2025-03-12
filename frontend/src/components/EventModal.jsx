@@ -10,25 +10,16 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
 
     // Reset form when modal is opened/closed or initialData changes
     useEffect(() => {
-        console.log('[EventModal] Effect triggered - isOpen:', isOpen, 'initialData:', initialData);
-        
         if (isOpen) {
             if (initialData) {
-                console.log('[EventModal] Setting form data from initialData:', initialData);
                 setTitle(initialData.title ?? '');
                 setDescription(initialData.description ?? '');
             } else {
-                console.log('[EventModal] No initialData, clearing form');
                 setTitle('');
                 setDescription('');
             }
         }
     }, [isOpen, initialData]);
-
-    // Log state changes
-    useEffect(() => {
-        console.log('[EventModal] Current form state - title:', title, 'description:', description);
-    }, [title, description]);
 
     if (!isOpen) return null;
 
@@ -43,12 +34,7 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
             }
         };
         
-        console.log('[EventModal] Storing form data before login:', formData);
         sessionStorage.setItem('pendingEventData', JSON.stringify(formData));
-        
-        // Add a delay to see the logs
-        console.log('[EventModal] Redirecting in 2 seconds...');
-        await new Promise(resolve => setTimeout(resolve, 10000));
         
         // Redirect to login with state
         loginWithRedirect({

@@ -35,12 +35,8 @@ function App() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      console.log('[App] Location state:', location.state);
-      
       // Check for state from Auth0 redirect
       if (location.state?.selectedSlot) {
-        console.log('[App] Found selected slot in state:', location.state.selectedSlot);
-        
         // Navigate to schedule with the slot data
         navigate('/schedule', {
           state: { selectedSlot: location.state.selectedSlot },
