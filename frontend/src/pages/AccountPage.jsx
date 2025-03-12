@@ -14,14 +14,23 @@ const AccountPage = () => {
             if (!user?.email) return;
             
             try {
-                const response = await fetch(`${config.apiUrl}/api/appointments/upcoming?email=${encodeURIComponent(user.email)}`);
+                const response = await fetch(`http://localhost:8080/api/appointments/upcoming?email=${encodeURIComponent(user.email)}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
                 if (!response.ok) {
-                    throw new Error('Failed to fetch appointments');
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
+
                 const data = await response.json();
                 setAppointments(data);
             } catch (err) {
-                setError(err.message);
+                console.error('Error fetching appointments:', err);
+                setError('Failed to load appointments. Please try again later.');
             } finally {
                 setLoading(false);
             }
@@ -56,9 +65,12 @@ const AccountPage = () => {
                         <ul className="appointment-list">
                             {appointments.map((appointment) => (
                                 <li key={appointment.id} className="appointment-item">
-                                    <p><strong>Date:</strong> {new Date(appointment.date).toLocaleDateString()}</p>
-                                    <p><strong>Time:</strong> {new Date(appointment.date).toLocaleTimeString()}</p>
-                                    <p><strong>Service:</strong> {appointment.service_type}</p>
+                                    <h3>{appointment.title}</h3>
+                                    <p><strong>Date:</strong> {new Date(appointment.start_time).toLocaleDateString()}</p>
+                                    <p><strong>Time:</strong> {new Date(appointment.start_time).toLocaleTimeString()} - {new Date(appointment.end_time).toLocaleTimeString()}</p>
+                                    {appointment.description && (
+                                        <p><strong>Description:</strong> {appointment.description}</p>
+                                    )}
                                 </li>
                             ))}
                         </ul>

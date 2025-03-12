@@ -34,18 +34,15 @@ const Schedule = () => {
 
             // Check location state first
             if (location.state?.selectedSlot) {
-                console.log('[Schedule] Found slot in location state:', location.state.selectedSlot);
                 slot = location.state.selectedSlot;
             }
 
             // Check session storage for form data
             const pendingEventData = sessionStorage.getItem('pendingEventData');
-            console.log('[Schedule] Checking pendingEventData:', pendingEventData);
             
             if (pendingEventData) {
                 try {
                     formData = JSON.parse(pendingEventData);
-                    console.log('[Schedule] Parsed form data:', formData);
                     
                     // If we didn't get the slot from location state, use it from form data
                     if (!slot && formData.selectedSlot) {
@@ -58,7 +55,6 @@ const Schedule = () => {
 
             // If we have a slot, set it and open the modal
             if (slot) {
-                console.log('[Schedule] Setting selected slot:', slot);
                 setSelectedSlot({
                     start: new Date(slot.start),
                     end: new Date(slot.end)
@@ -66,10 +62,6 @@ const Schedule = () => {
 
                 // If we have form data, set it as initial data BEFORE opening the modal
                 if (formData) {
-                    console.log('[Schedule] Setting initial event data:', {
-                        title: formData.title,
-                        description: formData.description
-                    });
                     setInitialEventData({
                         title: formData.title,
                         description: formData.description
@@ -81,7 +73,6 @@ const Schedule = () => {
 
                 // Clear the stored data AFTER everything is set up
                 if (pendingEventData) {
-                    console.log('[Schedule] Clearing pendingEventData');
                     sessionStorage.removeItem('pendingEventData');
                 }
             }
@@ -90,7 +81,6 @@ const Schedule = () => {
 
     const fetchScheduleEntries = async () => {
         try {
-            console.log('Fetching schedule entries...');
             const response = await fetch('http://localhost:8080/api/schedule', {
                 method: 'GET',
                 headers: {
@@ -104,7 +94,6 @@ const Schedule = () => {
             }
             
             const data = await response.json();
-            console.log('Received data:', data);
             
             const formattedEvents = data.map(entry => ({
                 id: entry.id,
@@ -211,23 +200,14 @@ const Schedule = () => {
 
     const handleEventDelete = async (eventId) => {
         try {
-            console.log('handleEventDelete called with eventId:', eventId);
-            console.log('eventId type:', typeof eventId);
-            
             // Convert eventId to number for comparison
             const eventIdNum = Number(eventId);
             
             // Store the event to be deleted in case we need to restore it
             const eventToDelete = events.find(e => e.id === eventIdNum);
-            console.log('Event to delete:', eventToDelete);
-            console.log('Current events:', events);
             
             // Optimistically remove the event from the UI
-            setEvents(prevEvents => {
-                const newEvents = prevEvents.filter(e => e.id !== eventIdNum);
-                console.log('New events after filter:', newEvents);
-                return newEvents;
-            });
+            setEvents(prevEvents => prevEvents.filter(e => e.id !== eventIdNum));
             setIsDetailsModalOpen(false);
 
             const response = await fetch(`http://localhost:8080/api/schedule/${eventIdNum}`, {
@@ -247,11 +227,7 @@ const Schedule = () => {
         } catch (err) {
             console.error('Error deleting event:', err);
             // Restore the event in the UI using the current events state
-            setEvents(prevEvents => {
-                const restoredEvents = [...prevEvents, eventToDelete];
-                console.log('Restored events:', restoredEvents);
-                return restoredEvents;
-            });
+            setEvents(prevEvents => [...prevEvents, eventToDelete]);
             setDeleteError('Failed to delete event. Please try again.');
         }
     };
