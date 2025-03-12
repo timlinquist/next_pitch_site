@@ -52,11 +52,31 @@ func (sc *ScheduleController) CreateScheduleEntry(c *gin.Context) {
 		return
 	}
 
+	// Get or create user by email
+	var userID int
 	err := sc.db.QueryRow(`
-		INSERT INTO schedule_entries (title, description, start_time, end_time)
-		VALUES ($1, $2, $3, $4)
+		WITH new_user AS (
+			INSERT INTO users (email, first_name, last_name)
+			VALUES ($1, '', '') -- Placeholder names, can be updated later
+			ON CONFLICT (email) DO NOTHING
+			RETURNING id
+		)
+		SELECT id FROM new_user
+		UNION ALL
+		SELECT id FROM users WHERE email = $1
+		LIMIT 1
+	`, entry.UserEmail).Scan(&userID)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user"})
+		return
+	}
+
+	err = sc.db.QueryRow(`
+		INSERT INTO schedule_entries (title, description, start_time, end_time, user_id)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, created_at, updated_at
-	`, entry.Title, entry.Description, entry.StartTime, entry.EndTime).
+	`, entry.Title, entry.Description, entry.StartTime, entry.EndTime, userID).
 		Scan(&entry.ID, &entry.CreatedAt, &entry.UpdatedAt)
 
 	if err != nil {
@@ -115,4 +135,43 @@ func (sc *ScheduleController) DeleteScheduleEntry(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Schedule entry deleted successfully"})
+}
+
+func (sc *ScheduleController) GetUpcomingAppointmentsByEmail(c *gin.Context) {
+	email := c.Query("email")
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required"})
+		return
+	}
+
+	rows, err := sc.db.Query(`
+		SELECT se.id, se.title, se.description, se.start_time, se.end_time, 
+			   se.created_at, se.updated_at 
+		FROM schedule_entries se
+		JOIN users u ON se.user_id = u.id
+		WHERE u.email = $1 AND se.start_time >= NOW()
+		ORDER BY se.start_time ASC
+	`, email)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch appointments"})
+		return
+	}
+	defer rows.Close()
+
+	var entries []models.ScheduleEntry
+	for rows.Next() {
+		var entry models.ScheduleEntry
+		err := rows.Scan(
+			&entry.ID, &entry.Title, &entry.Description,
+			&entry.StartTime, &entry.EndTime,
+			&entry.CreatedAt, &entry.UpdatedAt,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan appointment"})
+			return
+		}
+		entries = append(entries, entry)
+	}
+
+	c.JSON(http.StatusOK, entries)
 }

@@ -3,6 +3,15 @@ import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Schedule from './Schedule';
 
+// Mock Auth0
+vi.mock('@auth0/auth0-react', () => ({
+    useAuth0: () => ({
+        isAuthenticated: true,
+        user: { email: 'test@example.com' },
+        loginWithRedirect: vi.fn()
+    })
+}));
+
 // Mock the fetch function
 global.fetch = vi.fn();
 
