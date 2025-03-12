@@ -10,4 +10,5 @@ type ScheduleEntry struct {
 	EndTime     time.Time `json:"end_time" binding:"required"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	UserEmail   string    `json:"user_email" binding:"required"`
 }

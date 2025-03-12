@@ -3,6 +3,8 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import { useAuth0 } from '@auth0/auth0-react';
+import { useLocation } from 'react-router-dom';
 import EventModal from './EventModal';
 import EventDetailsModal from './EventDetailsModal';
 import '../styles/calendar.css';
@@ -16,10 +18,75 @@ const Schedule = () => {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [deleteError, setDeleteError] = useState(null);
+    const { isAuthenticated, loginWithRedirect, user } = useAuth0();
+    const location = useLocation();
+    const [initialEventData, setInitialEventData] = useState(null);
 
     useEffect(() => {
         fetchScheduleEntries();
     }, []);
+
+    useEffect(() => {
+        // Handle redirect with selected slot
+        if (isAuthenticated) {
+            let slot = null;
+            let formData = null;
+
+            // Check location state first
+            if (location.state?.selectedSlot) {
+                console.log('[Schedule] Found slot in location state:', location.state.selectedSlot);
+                slot = location.state.selectedSlot;
+            }
+
+            // Check session storage for form data
+            const pendingEventData = sessionStorage.getItem('pendingEventData');
+            console.log('[Schedule] Checking pendingEventData:', pendingEventData);
+            
+            if (pendingEventData) {
+                try {
+                    formData = JSON.parse(pendingEventData);
+                    console.log('[Schedule] Parsed form data:', formData);
+                    
+                    // If we didn't get the slot from location state, use it from form data
+                    if (!slot && formData.selectedSlot) {
+                        slot = formData.selectedSlot;
+                    }
+                } catch (err) {
+                    console.error('[Schedule] Error parsing pendingEventData:', err);
+                }
+            }
+
+            // If we have a slot, set it and open the modal
+            if (slot) {
+                console.log('[Schedule] Setting selected slot:', slot);
+                setSelectedSlot({
+                    start: new Date(slot.start),
+                    end: new Date(slot.end)
+                });
+
+                // If we have form data, set it as initial data BEFORE opening the modal
+                if (formData) {
+                    console.log('[Schedule] Setting initial event data:', {
+                        title: formData.title,
+                        description: formData.description
+                    });
+                    setInitialEventData({
+                        title: formData.title,
+                        description: formData.description
+                    });
+                }
+                
+                // Open the modal AFTER setting both slot and initial data
+                setIsModalOpen(true);
+
+                // Clear the stored data AFTER everything is set up
+                if (pendingEventData) {
+                    console.log('[Schedule] Clearing pendingEventData');
+                    sessionStorage.removeItem('pendingEventData');
+                }
+            }
+        }
+    }, [location.state, isAuthenticated]);
 
     const fetchScheduleEntries = async () => {
         try {
@@ -57,6 +124,7 @@ const Schedule = () => {
     };
 
     const handleDateSelect = (selectInfo) => {
+        // Always set the selected slot and open the modal first
         setSelectedSlot({
             start: selectInfo.start,
             end: selectInfo.end
@@ -77,13 +145,48 @@ const Schedule = () => {
 
     const handleEventSubmit = async (eventData) => {
         try {
+            if (!isAuthenticated) {
+                // Store the form data in sessionStorage before redirecting
+                const formData = {
+                    ...eventData,
+                    selectedSlot: {
+                        start: selectedSlot.start.toISOString(),
+                        end: selectedSlot.end.toISOString()
+                    }
+                };
+                sessionStorage.setItem('pendingEventData', JSON.stringify(formData));
+                
+                console.log('[Schedule] Redirecting to login with form data stored');
+                
+                // Redirect to login with appState
+                await loginWithRedirect({
+                    appState: {
+                        returnTo: location.pathname + location.search,
+                        selectedSlot: {
+                            start: selectedSlot.start.toISOString(),
+                            end: selectedSlot.end.toISOString()
+                        }
+                    }
+                });
+                return;
+            }
+
+            if (!user?.email) {
+                throw new Error('User must be authenticated to create events');
+            }
+
+            const eventWithEmail = {
+                ...eventData,
+                user_email: user.email
+            };
+
             const response = await fetch('http://localhost:8080/api/schedule', {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(eventData)
+                body: JSON.stringify(eventWithEmail)
             });
 
             if (!response.ok) {
@@ -198,6 +301,7 @@ const Schedule = () => {
                 onSubmit={handleEventSubmit}
                 startTime={selectedSlot?.start}
                 endTime={selectedSlot?.end}
+                initialData={initialEventData}
             />
             <EventDetailsModal
                 isOpen={isDetailsModalOpen}

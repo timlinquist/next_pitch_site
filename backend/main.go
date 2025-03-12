@@ -48,6 +48,7 @@ func main() {
 
 	// Schedule entries routes
 	r.GET("/api/schedule", scheduleController.GetScheduleEntries)
+	r.GET("/api/appointments/upcoming", scheduleController.GetUpcomingAppointmentsByEmail)
 	r.POST("/api/schedule", scheduleController.CreateScheduleEntry)
 	r.PUT("/api/schedule/:id", scheduleController.UpdateScheduleEntry)
 	r.DELETE("/api/schedule/:id", scheduleController.DeleteScheduleEntry)

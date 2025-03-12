@@ -92,6 +92,7 @@ const MechanicalAnalysis = () => {
 
     return (
         <div className="mechanical-analysis-container">
+            <h1>Mechanical Analysis</h1>
             <div className="upload-section">
                 <div className="upload-form">
                     <h2>Front View</h2>
