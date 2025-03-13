@@ -23,9 +23,17 @@ type VideoController struct {
 	video VideoUploader
 }
 
-func NewVideoController() (*VideoController, error) {
+// EnvLoader is a function type for loading environment variables
+type EnvLoader func(filenames ...string) error
+
+// NewVideoController creates a new video controller
+func NewVideoController(envLoader ...EnvLoader) (*VideoController, error) {
 	// Load environment variables
-	if err := godotenv.Load(); err != nil {
+	loader := godotenv.Load
+	if len(envLoader) > 0 {
+		loader = envLoader[0]
+	}
+	if err := loader(); err != nil {
 		return nil, fmt.Errorf("error loading .env file: %v", err)
 	}
 
