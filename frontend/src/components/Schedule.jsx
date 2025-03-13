@@ -8,6 +8,7 @@ import { useLocation } from 'react-router-dom';
 import EventModal from './EventModal';
 import EventDetailsModal from './EventDetailsModal';
 import '../styles/calendar.css';
+import { getApiUrl } from '../utils/api';
 
 const Schedule = () => {
     const [events, setEvents] = useState([]);
@@ -81,6 +82,9 @@ const Schedule = () => {
     }, [location.state, isAuthenticated]);
 
     const formatEvents = (entries, currentUserEmail) => {
+        if (!entries || !Array.isArray(entries)) {
+            return [];
+        }
         return entries.map(entry => ({
             id: entry.id,
             title: entry.title,
@@ -95,7 +99,7 @@ const Schedule = () => {
     const fetchScheduleEntries = async () => {
         try {
             console.log('[Schedule] Fetching schedule entries, user:', user?.email);
-            const response = await fetch('http://localhost:8080/api/schedule', {
+            const response = await fetch(getApiUrl('schedule'), {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -117,7 +121,7 @@ const Schedule = () => {
             setEvents(formattedEvents);
             setLoading(false);
         } catch (err) {
-            console.error('[Schedule] Error in fetchScheduleEntries:', err);
+            console.error('Error fetching schedule entries:', err);
             setError(err.message);
             setLoading(false);
         }
@@ -180,7 +184,7 @@ const Schedule = () => {
                 user_email: user.email
             };
 
-            const response = await fetch('http://localhost:8080/api/schedule', {
+            const response = await fetch(getApiUrl('schedule'), {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
@@ -222,7 +226,7 @@ const Schedule = () => {
             setEvents(prevEvents => prevEvents.filter(e => e.id !== eventIdNum));
             setIsDetailsModalOpen(false);
 
-            const response = await fetch(`http://localhost:8080/api/schedule/${eventIdNum}`, {
+            const response = await fetch(getApiUrl(`schedule/${eventIdNum}`), {
                 method: 'DELETE',
                 headers: {
                     'Accept': 'application/json',

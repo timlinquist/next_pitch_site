@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { Navigate } from 'react-router-dom';
 import config from '../config';
+import { getApiUrl } from '../utils/api';
 
 const AccountPage = () => {
     const { isAuthenticated, user, loginWithRedirect, logout } = useAuth0();
@@ -10,16 +11,15 @@ const AccountPage = () => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        const fetchAppointments = async () => {
-            if (!user?.email) return;
+        const fetchUpcomingAppointments = async () => {
+            if (!user) return;
             
             try {
-                const response = await fetch(`http://localhost:8080/api/appointments/upcoming?email=${encodeURIComponent(user.email)}`, {
+                const response = await fetch(getApiUrl(`appointments/upcoming?email=${encodeURIComponent(user.email)}`), {
                     method: 'GET',
                     headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }
+                        'Content-Type': 'application/json',
+                    },
                 });
 
                 if (!response.ok) {
@@ -29,15 +29,15 @@ const AccountPage = () => {
                 const data = await response.json();
                 setAppointments(data);
             } catch (err) {
-                console.error('Error fetching appointments:', err);
+                console.error('Error fetching upcoming appointments:', err);
                 setError('Failed to load appointments. Please try again later.');
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchAppointments();
-    }, [user?.email]);
+        fetchUpcomingAppointments();
+    }, [user]);
 
     if (!isAuthenticated) {
         return (
