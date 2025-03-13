@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom';
 import config from '../config';
 
 const AccountPage = () => {
-    const { isAuthenticated, user } = useAuth0();
+    const { isAuthenticated, user, loginWithRedirect, logout } = useAuth0();
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -40,13 +40,49 @@ const AccountPage = () => {
     }, [user?.email]);
 
     if (!isAuthenticated) {
-        return <Navigate to="/" />;
+        return (
+            <div className="container">
+                <div className="section" style={{ position: 'relative' }}>
+                    <button 
+                        className="btn"
+                        style={{
+                            position: 'absolute',
+                            top: '1rem',
+                            right: '1rem',
+                        }}
+                        onClick={() => loginWithRedirect({
+                            appState: { returnTo: '/account' }
+                        })}
+                    >
+                        Login
+                    </button>
+                    <h1>My Account</h1>
+                    <p>Please log in to view your account information.</p>
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="container">
-            <div className="section">
-                <h1>My Account</h1>
+            <div className="section" style={{ position: 'relative' }}>
+                <button 
+                    className="btn"
+                    style={{
+                        position: 'absolute',
+                        top: '1rem',
+                        right: '1rem',
+                    }}
+                    onClick={() => logout({  })}
+                >
+                    Logout
+                </button>
+                <h1 
+                    style={{
+                        marginTop: '1rem'
+                    }}
+                >My Account
+                </h1>
                 <div className="user-info">
                     <h2>Profile Information</h2>
                     <p><strong>Name:</strong> {user.name}</p>

@@ -21,9 +21,11 @@ func NewScheduleController() *ScheduleController {
 
 func (sc *ScheduleController) GetScheduleEntries(c *gin.Context) {
 	rows, err := sc.db.Query(`
-		SELECT id, title, description, start_time, end_time, created_at, updated_at 
-		FROM schedule_entries 
-		ORDER BY start_time ASC
+		SELECT se.id, se.title, se.description, se.start_time, se.end_time, 
+			   se.created_at, se.updated_at, u.email
+		FROM schedule_entries se
+		LEFT JOIN users u ON se.user_id = u.id
+		ORDER BY se.start_time ASC
 	`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule entries"})
@@ -34,10 +36,19 @@ func (sc *ScheduleController) GetScheduleEntries(c *gin.Context) {
 	var entries []models.ScheduleEntry
 	for rows.Next() {
 		var entry models.ScheduleEntry
-		err := rows.Scan(&entry.ID, &entry.Title, &entry.Description, &entry.StartTime, &entry.EndTime, &entry.CreatedAt, &entry.UpdatedAt)
+		var email sql.NullString
+		err := rows.Scan(
+			&entry.ID, &entry.Title, &entry.Description,
+			&entry.StartTime, &entry.EndTime,
+			&entry.CreatedAt, &entry.UpdatedAt,
+			&email,
+		)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan schedule entry"})
 			return
+		}
+		if email.Valid {
+			entry.UserEmail = email.String
 		}
 		entries = append(entries, entry)
 	}

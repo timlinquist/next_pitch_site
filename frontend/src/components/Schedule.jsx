@@ -23,8 +23,9 @@ const Schedule = () => {
     const [initialEventData, setInitialEventData] = useState(null);
 
     useEffect(() => {
+        // Remove the user check - we want to fetch entries regardless of auth status
         fetchScheduleEntries();
-    }, []);
+    }, []); // Remove user from dependencies since we don't need it for fetching
 
     useEffect(() => {
         // Handle redirect with selected slot
@@ -79,8 +80,21 @@ const Schedule = () => {
         }
     }, [location.state, isAuthenticated]);
 
+    const formatEvents = (entries, currentUserEmail) => {
+        return entries.map(entry => ({
+            id: entry.id,
+            title: entry.title,
+            start: entry.start_time,
+            end: entry.end_time,
+            description: entry.description,
+            user_email: entry.user_email,
+            classNames: entry.user_email === currentUserEmail ? [] : ['other-user-event']
+        }));
+    };
+
     const fetchScheduleEntries = async () => {
         try {
+            console.log('[Schedule] Fetching schedule entries, user:', user?.email);
             const response = await fetch('http://localhost:8080/api/schedule', {
                 method: 'GET',
                 headers: {
@@ -90,23 +104,20 @@ const Schedule = () => {
             });
             
             if (!response.ok) {
+                console.error('[Schedule] HTTP error response:', response.status, response.statusText);
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
             const data = await response.json();
+            console.log('[Schedule] Received data:', data);
             
-            const formattedEvents = data.map(entry => ({
-                id: entry.id,
-                title: entry.title,
-                start: entry.start_time,
-                end: entry.end_time,
-                description: entry.description
-            }));
+            const formattedEvents = formatEvents(data, user?.email);
+            console.log('[Schedule] Formatted events:', formattedEvents);
             
             setEvents(formattedEvents);
             setLoading(false);
         } catch (err) {
-            console.error('Error fetching schedule:', err);
+            console.error('[Schedule] Error in fetchScheduleEntries:', err);
             setError(err.message);
             setLoading(false);
         }
@@ -183,13 +194,14 @@ const Schedule = () => {
             }
 
             const newEvent = await response.json();
-            const formattedEvent = {
+            const formattedEvent = formatEvents([{
                 id: newEvent.id,
                 title: newEvent.title,
-                start: newEvent.start_time,
-                end: newEvent.end_time,
-                description: newEvent.description
-            };
+                start_time: newEvent.start_time,
+                end_time: newEvent.end_time,
+                description: newEvent.description,
+                user_email: user.email
+            }], user.email)[0];
 
             setEvents([...events, formattedEvent]);
         } catch (err) {

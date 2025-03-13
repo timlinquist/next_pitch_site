@@ -51,4 +51,9 @@
 
 .fc .fc-highlight {
     background-color: #e9ecef;
+}
+
+/* Other user events */
+.fc .other-user-event {
+    opacity: 0.25;
 } 
