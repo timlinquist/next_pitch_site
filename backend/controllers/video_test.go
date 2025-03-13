@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -43,7 +45,7 @@ func TestNewVideoController(t *testing.T) {
 			name:        "missing token",
 			envToken:    "",
 			wantErr:     true,
-			errContains: "DROPBOX_ACCESS_TOKEN",
+			errContains: "DROPBOX_ACCESS_TOKEN not found",
 		},
 	}
 
@@ -53,13 +55,21 @@ func TestNewVideoController(t *testing.T) {
 			os.Setenv("DROPBOX_ACCESS_TOKEN", tt.envToken)
 			defer os.Unsetenv("DROPBOX_ACCESS_TOKEN")
 
+			// Create a mock environment loader
+			mockEnvLoader := func(filenames ...string) error {
+				if tt.envToken == "" {
+					return fmt.Errorf("DROPBOX_ACCESS_TOKEN not found")
+				}
+				return nil
+			}
+
 			// Test initialization
-			got, err := NewVideoController()
+			got, err := NewVideoController(mockEnvLoader)
 			if tt.wantErr {
 				if err == nil {
 					t.Error("NewVideoController() error = nil, wantErr true")
 				}
-				if tt.errContains != "" && !errors.Is(err, errors.New(tt.errContains)) {
+				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("NewVideoController() error = %v, want error containing %v", err, tt.errContains)
 				}
 				return
@@ -156,7 +166,14 @@ func TestVideoController_UploadVideo(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Failed to create form file: %v", err)
 				}
-				part.Write([]byte(tt.fileContent))
+				// Create a file with the specified size
+				if tt.fileSize > maxFileSize {
+					// Create a large file by repeating content
+					content := make([]byte, tt.fileSize)
+					part.Write(content)
+				} else {
+					part.Write([]byte(tt.fileContent))
+				}
 			}
 			writer.Close()
 
