@@ -27,10 +27,11 @@ const AccountPage = () => {
                 }
 
                 const data = await response.json();
-                setAppointments(data);
+                setAppointments(data || []);
             } catch (err) {
                 console.error('Error fetching upcoming appointments:', err);
                 setError('Failed to load appointments. Please try again later.');
+                setAppointments([]);
             } finally {
                 setLoading(false);
             }
@@ -95,7 +96,7 @@ const AccountPage = () => {
                         <p>Loading appointments...</p>
                     ) : error ? (
                         <p className="error">{error}</p>
-                    ) : appointments.length === 0 ? (
+                    ) : !appointments || appointments.length === 0 ? (
                         <p>No upcoming appointments</p>
                     ) : (
                         <ul className="appointment-list">
