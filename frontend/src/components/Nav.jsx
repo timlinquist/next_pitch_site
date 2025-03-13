@@ -4,7 +4,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 
 const Nav = () => {
     const location = useLocation();
-    const { isAuthenticated, loginWithRedirect, logout } = useAuth0();
+    const { isAuthenticated, loginWithRedirect } = useAuth0();
 
     const isActive = (path) => {
         return location.pathname === path ? 'active' : '';
@@ -34,23 +34,6 @@ const Nav = () => {
                             })}
                         >
                             My Account
-                        </button>
-                    )}
-                    {isAuthenticated ? (
-                        <button 
-                            className="nav-link" 
-                            onClick={() => logout({ returnTo: window.location.origin })}
-                        >
-                            Logout
-                        </button>
-                    ) : (
-                        <button 
-                            className="nav-link" 
-                            onClick={() => loginWithRedirect({
-                                appState: { returnTo: location.pathname }
-                            })}
-                        >
-                            Login
                         </button>
                     )}
                 </div>
