@@ -1,6 +1,6 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { Auth0Provider } from '@auth0/auth0-react'
+import { Auth0Provider as Auth0ReactProvider } from '@auth0/auth0-react'
 import { BrowserRouter, useNavigate } from 'react-router-dom'
 import App from './App.jsx'
 import './styles/common.css'
@@ -17,19 +17,20 @@ const Auth0ProviderWithNavigate = ({ children }) => {
   };
 
   return (
-    <Auth0Provider
+    <Auth0ReactProvider
       domain={import.meta.env.VITE_AUTH0_CLIENT_DOMAIN}
       clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
       authorizationParams={{
         redirect_uri: window.location.origin,
-        scope: 'openid profile email'
+        scope: 'openid profile email',
+        audience: 'https://thenextpitch.org'
       }}
       useRefreshTokens={true}
       cacheLocation="localstorage"
       onRedirectCallback={onRedirectCallback}
     >
       {children}
-    </Auth0Provider>
+    </Auth0ReactProvider>
   );
 };
 

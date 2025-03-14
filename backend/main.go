@@ -11,6 +11,8 @@ import (
 	"github.com/joho/godotenv"
 	"nextpitch.com/backend/controllers"
 	"nextpitch.com/backend/db"
+	"nextpitch.com/backend/middleware"
+	"nextpitch.com/backend/services"
 )
 
 func main() {
@@ -31,9 +33,13 @@ func main() {
 	// CORS middleware
 	r.Use(cors.Default())
 
+	// Initialize services
+	userService := services.NewUserService(db.DB)
+
 	// Initialize controllers
 	scheduleController := controllers.NewScheduleController()
 	contactController := controllers.NewContactController()
+	userController := controllers.NewUserController(userService)
 
 	videoController, err := controllers.NewVideoController()
 	if err != nil {
@@ -46,19 +52,26 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "pong"})
 	})
 
-	// Schedule entries routes
-	r.GET("/api/schedule", scheduleController.GetScheduleEntries)
-	r.GET("/api/appointments/upcoming", scheduleController.GetUpcomingAppointmentsByEmail)
-	r.POST("/api/schedule", scheduleController.CreateScheduleEntry)
+	// Protected routes with Auth0 middleware
+	protected := r.Group("/api")
+	protected.Use(middleware.AuthMiddleware())
+	{
+		// User routes
+		protected.GET("/users/me", userController.GetCurrentUser)
 
-	r.PUT("/api/schedule/:id", scheduleController.UpdateScheduleEntry)
-	r.DELETE("/api/schedule/:id", scheduleController.DeleteScheduleEntry)
+		// Schedule entries routes
+		protected.GET("/schedule", scheduleController.GetScheduleEntries)
+		protected.GET("/appointments/upcoming", scheduleController.GetUpcomingAppointmentsByEmail)
+		protected.POST("/schedule", scheduleController.CreateScheduleEntry)
+		protected.PUT("/schedule/:id", scheduleController.UpdateScheduleEntry)
+		protected.DELETE("/schedule/:id", scheduleController.DeleteScheduleEntry)
 
-	// Contact form submission
+		// Video upload route
+		protected.POST("/video/upload", videoController.UploadVideo)
+	}
+
+	// Public routes
 	r.POST("/api/contact", contactController.SendEmail)
-
-	// Video upload route
-	r.POST("/api/video/upload", videoController.UploadVideo)
 
 	// Serve static files from frontend directory
 	r.Static("/static", "../frontend")

@@ -5,7 +5,7 @@ import config from '../config';
 import { getApiUrl } from '../utils/api';
 
 const AccountPage = () => {
-    const { isAuthenticated, user, loginWithRedirect, logout } = useAuth0();
+    const { isAuthenticated, user, loginWithRedirect, logout, getAccessTokenSilently } = useAuth0();
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -15,10 +15,12 @@ const AccountPage = () => {
             if (!user) return;
             
             try {
+                const token = await getAccessTokenSilently();
                 const response = await fetch(getApiUrl(`appointments/upcoming?email=${encodeURIComponent(user.email)}`), {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
                     },
                 });
 
@@ -38,7 +40,7 @@ const AccountPage = () => {
         };
 
         fetchUpcomingAppointments();
-    }, [user]);
+    }, [user, getAccessTokenSilently]);
 
     if (!isAuthenticated) {
         return (
