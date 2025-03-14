@@ -9,6 +9,9 @@ import EventModal from './EventModal';
 import EventDetailsModal from './EventDetailsModal';
 import '../styles/calendar.css';
 import { getApiUrl } from '../utils/api';
+import { useAuth0Context } from '../contexts/Auth0Context';
+
+const MAX_NON_ADMIN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
 const Schedule = () => {
     const [events, setEvents] = useState([]);
@@ -19,14 +22,17 @@ const Schedule = () => {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [deleteError, setDeleteError] = useState(null);
-    const { isAuthenticated, loginWithRedirect, user } = useAuth0();
+    const { isAuthenticated, loginWithRedirect, user, isAdmin } = useAuth0();
     const location = useLocation();
     const [initialEventData, setInitialEventData] = useState(null);
-
+    
     useEffect(() => {
-        // Remove the user check - we want to fetch entries regardless of auth status
-        fetchScheduleEntries();
-    }, []); // Remove user from dependencies since we don't need it for fetching
+        if (isAuthenticated) {
+            fetchScheduleEntries();
+        } else {
+            setLoading(false);
+        }
+    }, [isAuthenticated]);
 
     useEffect(() => {
         // Handle redirect with selected slot
@@ -92,7 +98,7 @@ const Schedule = () => {
             end: entry.end_time,
             description: entry.description,
             user_email: entry.user_email,
-            classNames: entry.user_email === currentUserEmail ? [] : ['other-user-event']
+            className: entry.user_email === currentUserEmail ? 'user-event' : 'other-event'
         }));
     };
 
@@ -128,89 +134,87 @@ const Schedule = () => {
     };
 
     const handleDateSelect = (selectInfo) => {
-        // Always set the selected slot and open the modal first
-        setSelectedSlot({
-            start: selectInfo.start,
-            end: selectInfo.end
+        if (!isAuthenticated) {
+            setError('Please log in to create events');
+            return;
+        }
+
+        const start = selectInfo.start;
+        const end = selectInfo.end;
+        const duration = end - start;
+
+        if (!isAdmin && duration > MAX_NON_ADMIN_DURATION) {
+            setError('Non-admin users cannot create events longer than 2 hours');
+            return;
+        }
+
+        // Check for overlapping events
+        const hasOverlap = events.some(event => {
+            return (start < event.end && end > event.start);
         });
+
+        if (hasOverlap) {
+            setIsModalOpen(false);
+            setSelectedSlot(null);
+            setError('This time slot overlaps with an existing event');
+            return;
+        }
+
+        // Clear any previous error state when opening the modal
+        setError(null);
+        setSelectedSlot({ start, end });
         setIsModalOpen(true);
     };
 
     const handleEventClick = (clickInfo) => {
-        setSelectedEvent({
-            id: Number(clickInfo.event.id),
+        if (!isAuthenticated || clickInfo.event.extendedProps.user_email !== user.email) {
+            return;
+        }
+
+        setSelectedSlot({
+            start: clickInfo.event.start,
+            end: clickInfo.event.end,
             title: clickInfo.event.title,
             description: clickInfo.event.extendedProps.description,
-            start: clickInfo.event.start,
-            end: clickInfo.event.end
         });
-        setIsDetailsModalOpen(true);
+        setIsModalOpen(true);
     };
 
     const handleEventSubmit = async (eventData) => {
         try {
-            if (!isAuthenticated) {
-                // Store the form data in sessionStorage before redirecting
-                const formData = {
-                    ...eventData,
-                    selectedSlot: {
-                        start: selectedSlot.start.toISOString(),
-                        end: selectedSlot.end.toISOString()
-                    }
-                };
-                sessionStorage.setItem('pendingEventData', JSON.stringify(formData));
-                
-                console.log('[Schedule] Redirecting to login with form data stored');
-                
-                // Redirect to login with appState
-                await loginWithRedirect({
-                    appState: {
-                        returnTo: location.pathname + location.search,
-                        selectedSlot: {
-                            start: selectedSlot.start.toISOString(),
-                            end: selectedSlot.end.toISOString()
-                        }
-                    }
-                });
-                return;
-            }
-
-            if (!user?.email) {
-                throw new Error('User must be authenticated to create events');
-            }
-
-            const eventWithEmail = {
-                ...eventData,
-                user_email: user.email
-            };
-
             const response = await fetch(getApiUrl('schedule'), {
                 method: 'POST',
                 headers: {
-                    'Accept': 'application/json',
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(eventWithEmail)
+                body: JSON.stringify({
+                    ...eventData,
+                    user_email: user.email,
+                }),
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error('Failed to create event');
             }
 
             const newEvent = await response.json();
-            const formattedEvent = formatEvents([{
+            const formattedEvent = {
                 id: newEvent.id,
                 title: newEvent.title,
-                start_time: newEvent.start_time,
-                end_time: newEvent.end_time,
+                start: newEvent.start_time,
+                end: newEvent.end_time,
                 description: newEvent.description,
-                user_email: user.email
-            }], user.email)[0];
+                user_email: newEvent.user_email,
+                className: 'user-event'
+            };
 
             setEvents([...events, formattedEvent]);
+            setIsModalOpen(false);
+            setSelectedSlot(null);
+            setError(null);
         } catch (err) {
             console.error('Error creating event:', err);
-            alert('Failed to create event. Please try again.');
+            setError('Failed to create event. Please try again.');
         }
     };
 
@@ -252,21 +256,31 @@ const Schedule = () => {
         return <div className="container">Loading...</div>;
     }
 
-    if (error) {
-        return <div className="container">Error loading schedule</div>;
+    if (!isAuthenticated) {
+        return (
+            <div className="container">
+                <p>Please log in to schedule appointments</p>
+                <button onClick={() => loginWithRedirect({ appState: { returnTo: '/schedule' } })} className="btn">Log In</button>
+            </div>
+        );
     }
 
     return (
         <div className="container">
+            {error && (
+                <div role="alert" className="alert alert-error">
+                    {error}
+                </div>
+            )}
+            {deleteError && (
+                <div role="alert" className="alert alert-error">
+                    {deleteError}
+                </div>
+            )}
             <div className="section">
                 <h1>Schedule a Consultation</h1>
                 <p>View our availability and schedule a consultation to discuss your pitch needs. We offer flexible scheduling options to accommodate your timeline.</p>
             </div>
-            {deleteError && (
-                <div className="alert alert-error">
-                    {deleteError}
-                </div>
-            )}
             <div className="calendar-container">
                 <FullCalendar
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
@@ -287,20 +301,18 @@ const Schedule = () => {
                     initialDate={new Date()}
                 />
             </div>
-            <EventModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSubmit={handleEventSubmit}
-                startTime={selectedSlot?.start}
-                endTime={selectedSlot?.end}
-                initialData={initialEventData}
-            />
-            <EventDetailsModal
-                isOpen={isDetailsModalOpen}
-                onClose={() => setIsDetailsModalOpen(false)}
-                event={selectedEvent}
-                onDelete={handleEventDelete}
-            />
+            {isModalOpen && (
+                <EventModal
+                    isOpen={isModalOpen}
+                    onClose={() => {
+                        setIsModalOpen(false);
+                        setSelectedSlot(null);
+                        setError(null);
+                    }}
+                    onSubmit={handleEventSubmit}
+                    initialData={selectedSlot}
+                />
+            )}
         </div>
     );
 };
