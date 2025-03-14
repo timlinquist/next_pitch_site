@@ -3,14 +3,8 @@ import { render, screen, fireEvent, waitFor, waitForElementToBeRemoved, act } fr
 import { BrowserRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Schedule from './Schedule';
-import { useAuth0Context, Auth0Provider } from '../contexts/Auth0Context';
 import { useAuth0 } from '@auth0/auth0-react';
 
-// Mock the Auth0Context
-vi.mock('../contexts/Auth0Context', () => ({
-    useAuth0Context: vi.fn(),
-    Auth0Provider: ({ children }) => <div>{children}</div>
-}));
 
 // Mock the Auth0 hook
 vi.mock('@auth0/auth0-react', () => ({

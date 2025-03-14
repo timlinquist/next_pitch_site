@@ -9,11 +9,11 @@ import EventModal from './EventModal';
 import EventDetailsModal from './EventDetailsModal';
 import '../styles/calendar.css';
 import { getApiUrl } from '../utils/api';
-import { useAuth0Context } from '../contexts/Auth0Context';
 
 const MAX_NON_ADMIN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
 const Schedule = () => {
+    const { user, isAuthenticated, loginWithRedirect, getAccessTokenSilently } = useAuth0();
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -22,17 +22,44 @@ const Schedule = () => {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [deleteError, setDeleteError] = useState(null);
-    const { isAuthenticated, loginWithRedirect, user, isAdmin } = useAuth0();
+    const [isAdmin, setIsAdmin] = useState(false);
     const location = useLocation();
     const [initialEventData, setInitialEventData] = useState(null);
-    
+
+    const checkAdminStatus = async () => {
+        try {
+            const token = await getAccessTokenSilently();
+            console.log('[Schedule] Got access token:', token);
+            
+            const response = await fetch(getApiUrl('users/me'), {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                const userData = await response.json();
+                setIsAdmin(userData.is_admin);
+            } else {
+                console.error('Failed to fetch user admin status:', response.status);
+                setIsAdmin(false);
+            }
+        } catch (error) {
+            console.error('Error checking admin status:', error);
+            setIsAdmin(false);
+        }
+    };
+
     useEffect(() => {
         if (isAuthenticated) {
+            checkAdminStatus();
             fetchScheduleEntries();
         } else {
             setLoading(false);
         }
-    }, [isAuthenticated]);
+    }, [isAuthenticated, getAccessTokenSilently]);
 
     useEffect(() => {
         // Handle redirect with selected slot
@@ -93,23 +120,27 @@ const Schedule = () => {
         }
         return entries.map(entry => ({
             id: entry.id,
-            title: entry.title,
+            title: isAdmin || entry.user_email === currentUserEmail ? entry.title : 'Unavailable',
             start: entry.start_time,
             end: entry.end_time,
-            description: entry.description,
+            description: isAdmin || entry.user_email === currentUserEmail ? entry.description : '',
             user_email: entry.user_email,
-            className: entry.user_email === currentUserEmail ? 'user-event' : 'other-event'
+            className: entry.user_email === currentUserEmail ? 'user-event' : 'other-event',
+            editable: isAdmin,
+            interactive: isAdmin || entry.user_email === currentUserEmail
         }));
     };
 
     const fetchScheduleEntries = async () => {
         try {
             console.log('[Schedule] Fetching schedule entries, user:', user?.email);
+            const token = await getAccessTokenSilently();
             const response = await fetch(getApiUrl('schedule'), {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
             });
             
@@ -139,8 +170,8 @@ const Schedule = () => {
             return;
         }
 
-        const start = selectInfo.start;
-        const end = selectInfo.end;
+        const start = new Date(selectInfo.start);
+        const end = new Date(selectInfo.end);
         const duration = end - start;
 
         if (!isAdmin && duration > MAX_NON_ADMIN_DURATION) {
@@ -148,9 +179,11 @@ const Schedule = () => {
             return;
         }
 
-        // Check for overlapping events
+        // Check for overlapping events - including other users' events
         const hasOverlap = events.some(event => {
-            return (start < event.end && end > event.start);
+            const eventStart = new Date(event.start);
+            const eventEnd = new Date(event.end);
+            return (start < eventEnd && end > eventStart);
         });
 
         if (hasOverlap) {
@@ -167,28 +200,45 @@ const Schedule = () => {
     };
 
     const handleEventClick = (clickInfo) => {
-        if (!isAuthenticated || clickInfo.event.extendedProps.user_email !== user.email) {
+        if (!isAuthenticated) {
+            setError('Please log in to view event details');
             return;
         }
 
-        setSelectedSlot({
+        const eventUserEmail = clickInfo.event.extendedProps.user_email;
+        const isUsersEvent = eventUserEmail === user.email;
+
+        // Allow admins to view any event, otherwise only show user's own events
+        if (!isAdmin && !isUsersEvent) {
+            return;
+        }
+
+        // Set the selected event for the details modal
+        setSelectedEvent({
+            id: clickInfo.event.id,
+            title: clickInfo.event.title,
             start: clickInfo.event.start,
             end: clickInfo.event.end,
-            title: clickInfo.event.title,
             description: clickInfo.event.extendedProps.description,
+            user_email: eventUserEmail
         });
-        setIsModalOpen(true);
+
+        setIsDetailsModalOpen(true);
     };
 
     const handleEventSubmit = async (eventData) => {
         try {
+            const token = await getAccessTokenSilently();
             const response = await fetch(getApiUrl('schedule'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     ...eventData,
+                    start_time: eventData.start_time.toISOString(),
+                    end_time: eventData.end_time.toISOString(),
                     user_email: user.email,
                 }),
             });
@@ -198,57 +248,39 @@ const Schedule = () => {
             }
 
             const newEvent = await response.json();
-            const formattedEvent = {
-                id: newEvent.id,
-                title: newEvent.title,
-                start: newEvent.start_time,
-                end: newEvent.end_time,
-                description: newEvent.description,
-                user_email: newEvent.user_email,
-                className: 'user-event'
-            };
+            const formattedEvent = formatEvents([newEvent], user.email)[0];
 
-            setEvents([...events, formattedEvent]);
+            setEvents(prevEvents => [...prevEvents, formattedEvent]);
             setIsModalOpen(false);
             setSelectedSlot(null);
-            setError(null);
-        } catch (err) {
-            console.error('Error creating event:', err);
-            setError('Failed to create event. Please try again.');
+            setInitialEventData(null);
+        } catch (error) {
+            console.error('Error creating event:', error);
+            setError('Failed to create event');
         }
     };
 
     const handleEventDelete = async (eventId) => {
         try {
-            // Convert eventId to number for comparison
-            const eventIdNum = Number(eventId);
-            
-            // Store the event to be deleted in case we need to restore it
-            const eventToDelete = events.find(e => e.id === eventIdNum);
-            
-            // Optimistically remove the event from the UI
-            setEvents(prevEvents => prevEvents.filter(e => e.id !== eventIdNum));
-            setIsDetailsModalOpen(false);
-
-            const response = await fetch(getApiUrl(`schedule/${eventIdNum}`), {
+            const token = await getAccessTokenSilently();
+            const response = await fetch(getApiUrl(`schedule/${eventId}`), {
                 method: 'DELETE',
                 headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                },
+                    'Authorization': `Bearer ${token}`
+                }
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error('Failed to delete event');
             }
 
-            // Clear any previous delete errors
+            setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+            setIsDetailsModalOpen(false);
+            setSelectedEvent(null);
             setDeleteError(null);
-        } catch (err) {
-            console.error('Error deleting event:', err);
-            // Restore the event in the UI using the current events state
-            setEvents(prevEvents => [...prevEvents, eventToDelete]);
-            setDeleteError('Failed to delete event. Please try again.');
+        } catch (error) {
+            console.error('Error deleting event:', error);
+            setDeleteError('Failed to delete event');
         }
     };
 
@@ -299,6 +331,9 @@ const Schedule = () => {
                     eventClick={handleEventClick}
                     timeZone="local"
                     initialDate={new Date()}
+                    eventDidMount={(info) => {
+                        info.el.setAttribute('data-interactive', info.event.extendedProps.interactive);
+                    }}
                 />
             </div>
             {isModalOpen && (
@@ -311,6 +346,20 @@ const Schedule = () => {
                     }}
                     onSubmit={handleEventSubmit}
                     initialData={selectedSlot}
+                    startTime={selectedSlot?.start}
+                    endTime={selectedSlot?.end}
+                />
+            )}
+            {isDetailsModalOpen && selectedEvent && (
+                <EventDetailsModal
+                    isOpen={isDetailsModalOpen}
+                    onClose={() => {
+                        setIsDetailsModalOpen(false);
+                        setSelectedEvent(null);
+                        setError(null);
+                    }}
+                    event={selectedEvent}
+                    onDelete={handleEventDelete}
                 />
             )}
         </div>

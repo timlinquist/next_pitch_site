@@ -19,10 +19,19 @@ func NewUserService(db DB) *UserService {
 func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := s.db.QueryRow(`
-		SELECT id, email, name, is_admin, created_at, updated_at
+		SELECT id, email, first_name, last_name, phone_number, admin, created_at, updated_at
 		FROM users
 		WHERE email = $1
-	`, email).Scan(&user.ID, &user.Email, &user.Name, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
+	`, email).Scan(
+		&user.ID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.PhoneNumber,
+		&user.IsAdmin,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
 
 	if err == sql.ErrNoRows {
 		return nil, errors.New("user not found")
@@ -37,10 +46,18 @@ func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 func (s *UserService) CreateUser(user *models.User) error {
 	now := time.Now()
 	err := s.db.QueryRow(`
-		INSERT INTO users (email, name, is_admin, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO users (email, first_name, last_name, phone_number, admin, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id
-	`, user.Email, user.Name, user.IsAdmin, now, now).Scan(&user.ID)
+	`,
+		user.Email,
+		user.FirstName.String,
+		user.LastName.String,
+		user.PhoneNumber.String,
+		user.IsAdmin,
+		now,
+		now,
+	).Scan(&user.ID)
 
 	if err != nil {
 		return err

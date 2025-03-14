@@ -37,7 +37,6 @@
 .fc .fc-event {
     background-color: #007bff;
     border-color: #0056b3;
-    cursor: pointer;
 }
 
 .fc .fc-event:hover {
@@ -53,7 +52,38 @@
     background-color: #e9ecef;
 }
 
+/* User's own events */
+.fc .user-event {
+    background-color: #007bff;
+    border-color: #0056b3;
+    cursor: pointer;
+}
+
+.fc .user-event:hover {
+    background-color: #0056b3;
+    border-color: #004085;
+}
+
 /* Other user events */
-.fc .other-user-event {
-    opacity: 0.25;
+.fc .other-event {
+    background-color: #6c757d;
+    border-color: #5a6268;
+    opacity: 0.75;
+}
+
+/* Make other events interactive for admins */
+.fc .other-event[data-interactive="true"] {
+    cursor: pointer;
+    opacity: 1;
+}
+
+.fc .other-event[data-interactive="true"]:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
+
+/* Non-interactive events */
+.fc .other-event[data-interactive="false"] {
+    cursor: default;
+    pointer-events: none;
 } 

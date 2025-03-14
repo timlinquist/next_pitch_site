@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import '../styles/mechanical-analysis.css';
 import config from '../config';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
 const MechanicalAnalysis = () => {
+    const { getAccessTokenSilently } = useAuth0();
     const [frontVideo, setFrontVideo] = useState(null);
     const [sideVideo, setSideVideo] = useState(null);
     const [frontProgress, setFrontProgress] = useState(0);
@@ -29,11 +31,15 @@ const MechanicalAnalysis = () => {
             // Validate file before upload
             validateFile(file);
 
+            const token = await getAccessTokenSilently();
             const formData = new FormData();
             formData.append('video', file);
 
             const response = await fetch(`${config.apiBaseUrl}/video/upload`, {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
                 body: formData,
                 onUploadProgress: (progressEvent) => {
                     const progress = (progressEvent.loaded / progressEvent.total) * 100;
@@ -92,7 +98,6 @@ const MechanicalAnalysis = () => {
 
     return (
         <div className="mechanical-analysis-container">
-            <h1>Mechanical Analysis</h1>
             <div className="upload-section">
                 <div className="upload-form">
                     <h2>Front View</h2>
