@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import AccountPage from './AccountPage';
 import { useAuth0 } from '@auth0/auth0-react';
@@ -8,6 +8,9 @@ import { useAuth0 } from '@auth0/auth0-react';
 vi.mock('@auth0/auth0-react', () => ({
     useAuth0: vi.fn(),
 }));
+
+// Mock fetch globally
+global.fetch = vi.fn();
 
 const renderWithProviders = (component) => {
     return render(
@@ -18,6 +21,17 @@ const renderWithProviders = (component) => {
 };
 
 describe('AccountPage Component', () => {
+    beforeEach(() => {
+        // Reset all mocks before each test
+        vi.clearAllMocks();
+        
+        // Setup default fetch mock
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve([]),
+        });
+    });
+
     it('shows login button when not authenticated', () => {
         // Override the auth0 mock for this test
         vi.mocked(useAuth0).mockReturnValue({
@@ -32,7 +46,7 @@ describe('AccountPage Component', () => {
         expect(screen.getByText('Please log in to view your account information.')).toBeInTheDocument();
     });
 
-    it('shows user information when authenticated', () => {
+    it('shows user information when authenticated', async () => {
         // Set up authenticated state
         vi.mocked(useAuth0).mockReturnValue({
             isAuthenticated: true,
@@ -42,6 +56,12 @@ describe('AccountPage Component', () => {
         });
 
         renderWithProviders(<AccountPage />);
+        
+        // Wait for loading to finish
+        await waitFor(() => {
+            expect(screen.queryByText('Loading appointments...')).not.toBeInTheDocument();
+        });
+
         expect(screen.getByText('Test User')).toBeInTheDocument();
         expect(screen.getByText('test@example.com')).toBeInTheDocument();
     });
@@ -69,12 +89,10 @@ describe('AccountPage Component', () => {
         });
 
         // Mock fetch to return null
-        global.fetch = vi.fn(() =>
-            Promise.resolve({
-                ok: true,
-                json: () => Promise.resolve(null),
-            })
-        );
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve(null),
+        });
 
         renderWithProviders(<AccountPage />);
 
@@ -97,12 +115,10 @@ describe('AccountPage Component', () => {
         });
 
         // Mock fetch to return empty array
-        global.fetch = vi.fn(() =>
-            Promise.resolve({
-                ok: true,
-                json: () => Promise.resolve([]),
-            })
-        );
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve([]),
+        });
 
         renderWithProviders(<AccountPage />);
 
@@ -135,12 +151,10 @@ describe('AccountPage Component', () => {
         ];
 
         // Mock fetch to return appointments
-        global.fetch = vi.fn(() =>
-            Promise.resolve({
-                ok: true,
-                json: () => Promise.resolve(mockAppointments),
-            })
-        );
+        global.fetch.mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve(mockAppointments),
+        });
 
         renderWithProviders(<AccountPage />);
 
@@ -164,12 +178,10 @@ describe('AccountPage Component', () => {
         });
 
         // Mock fetch to return error
-        global.fetch = vi.fn(() =>
-            Promise.resolve({
-                ok: false,
-                status: 500,
-            })
-        );
+        global.fetch.mockResolvedValueOnce({
+            ok: false,
+            status: 500,
+        });
 
         renderWithProviders(<AccountPage />);
 

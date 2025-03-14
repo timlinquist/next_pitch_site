@@ -1,0 +1,151 @@
+.schedule-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px;
+  margin-bottom: 20px;
+  border-radius: 4px;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-group textarea {
+  height: 100px;
+  resize: vertical;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: #1976d2;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn:hover {
+  background-color: #1565c0;
+}
+
+.btn-danger {
+  background-color: #d32f2f;
+}
+
+.btn-danger:hover {
+  background-color: #c62828;
+}
+
+.login-prompt {
+  text-align: center;
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  margin-top: 20px;
+}
+
+/* Event styles */
+.user-event {
+  background-color: #1976d2 !important;
+  border-color: #1565c0 !important;
+}
+
+.other-event {
+  background-color: #757575 !important;
+  border-color: #616161 !important;
+  opacity: 0.8;
+}
+
+/* FullCalendar customizations */
+.fc-event {
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.fc-event-title {
+  font-weight: 500;
+}
+
+.fc-timegrid-slot {
+  height: 2.5em;
+}
+
+.fc-timegrid-slot-label {
+  font-size: 12px;
+}
+
+.fc-toolbar-title {
+  font-size: 1.2em;
+  font-weight: 500;
+}
+
+.fc-button {
+  background-color: #1976d2 !important;
+  border-color: #1976d2 !important;
+  color: white !important;
+  text-transform: capitalize !important;
+  font-size: 14px !important;
+  padding: 6px 12px !important;
+}
+
+.fc-button:hover {
+  background-color: #1565c0 !important;
+  border-color: #1565c0 !important;
+}
+
+.fc-button-active {
+  background-color: #1565c0 !important;
+  border-color: #1565c0 !important;
+} 
