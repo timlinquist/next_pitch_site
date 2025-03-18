@@ -11,6 +11,7 @@ import (
 	"github.com/joho/godotenv"
 	"nextpitch.com/backend/controllers"
 	"nextpitch.com/backend/db"
+	"nextpitch.com/backend/handlers"
 	"nextpitch.com/backend/middleware"
 	"nextpitch.com/backend/services"
 )
@@ -35,9 +36,10 @@ func main() {
 
 	// Initialize services
 	userService := services.NewUserService(db.DB)
+	scheduleService := services.NewScheduleService(db.DB)
 
-	// Initialize controllers
-	scheduleController := controllers.NewScheduleController()
+	// Initialize handlers and controllers
+	scheduleHandler := handlers.NewScheduleHandler(scheduleService, userService)
 	contactController := controllers.NewContactController()
 	userController := controllers.NewUserController(userService)
 
@@ -60,11 +62,11 @@ func main() {
 		protected.GET("/users/me", userController.GetCurrentUser)
 
 		// Schedule entries routes
-		protected.GET("/schedule", scheduleController.GetScheduleEntries)
-		protected.GET("/appointments/upcoming", scheduleController.GetUpcomingAppointmentsByEmail)
-		protected.POST("/schedule", scheduleController.CreateScheduleEntry)
-		protected.PUT("/schedule/:id", scheduleController.UpdateScheduleEntry)
-		protected.DELETE("/schedule/:id", scheduleController.DeleteScheduleEntry)
+		protected.GET("/schedule", scheduleHandler.GetScheduleEntries)
+		protected.GET("/appointments/upcoming", scheduleHandler.GetUpcomingAppointmentsByEmail)
+		protected.POST("/schedule", scheduleHandler.CreateScheduleEntry)
+		protected.PUT("/schedule/:id", scheduleHandler.UpdateScheduleEntry)
+		protected.DELETE("/schedule/:id", scheduleHandler.DeleteScheduleEntry)
 
 		// Video upload route
 		protected.POST("/video/upload", videoController.UploadVideo)

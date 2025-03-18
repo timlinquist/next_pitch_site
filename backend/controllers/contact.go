@@ -5,12 +5,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"nextpitch.com/backend/models"
+	"nextpitch.com/backend/services"
 )
 
-type ContactController struct{}
+type ContactController struct {
+	emailService *services.EmailService
+}
 
 func NewContactController() *ContactController {
-	return &ContactController{}
+	return &ContactController{
+		emailService: services.NewEmailService(),
+	}
 }
 
 func (c *ContactController) SendEmail(ctx *gin.Context) {
@@ -20,7 +25,7 @@ func (c *ContactController) SendEmail(ctx *gin.Context) {
 		return
 	}
 
-	if err := models.SendEmail(form); err != nil {
+	if err := c.emailService.SendContactEmail(form); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
