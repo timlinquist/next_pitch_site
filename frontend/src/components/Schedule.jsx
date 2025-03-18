@@ -274,7 +274,9 @@ const Schedule = () => {
                 throw new Error('Failed to delete event');
             }
 
-            setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId));
+            // Convert eventId to string for consistent comparison
+            const eventIdStr = String(eventId);
+            setEvents(prevEvents => prevEvents.filter(event => String(event.id) !== eventIdStr));
             setIsDetailsModalOpen(false);
             setSelectedEvent(null);
             setDeleteError(null);
