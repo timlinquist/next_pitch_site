@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -12,12 +13,32 @@ import (
 type ScheduleHandler struct {
 	scheduleService *services.ScheduleService
 	userService     *services.UserService
+	emailService    *services.EmailService
+	emailChan       chan models.ScheduleEntry
 }
 
 func NewScheduleHandler(scheduleService *services.ScheduleService, userService *services.UserService) *ScheduleHandler {
-	return &ScheduleHandler{
+	h := &ScheduleHandler{
 		scheduleService: scheduleService,
 		userService:     userService,
+		emailService:    services.NewEmailService(),
+		emailChan:       make(chan models.ScheduleEntry, 100), // Buffer size of 100
+	}
+
+	// Start the email worker
+	go h.processEmails()
+
+	return h
+}
+
+func (h *ScheduleHandler) processEmails() {
+	for entry := range h.emailChan {
+		log.Printf("[Schedule] Processing cancellation email for appointment %d", entry.ID)
+		if err := h.emailService.SendAppointmentCancellationEmail(&entry); err != nil {
+			log.Printf("[Schedule] Error sending cancellation email for appointment %d: %v", entry.ID, err)
+		} else {
+			log.Printf("[Schedule] Successfully sent cancellation email for appointment %d", entry.ID)
+		}
 	}
 }
 
@@ -109,10 +130,40 @@ func (h *ScheduleHandler) DeleteScheduleEntry(c *gin.Context) {
 		return
 	}
 
+	// Get the entry details before deleting
+	entry, err := h.scheduleService.GetScheduleEntry(entryID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Delete the entry
 	if err := h.scheduleService.DeleteScheduleEntry(entryID, userEmail.(string)); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Send the entry to the email channel for processing
+	log.Printf("[Schedule] Queueing cancellation email for appointment %d", entry.ID)
+	h.emailChan <- *entry
+
 	c.Status(http.StatusNoContent)
+}
+
+func (h *ScheduleHandler) GetUpcomingAppointmentsByEmail(c *gin.Context) {
+	// Get user email from context
+	userEmail, exists := c.Get("user_email")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+
+	// Get upcoming appointments from the schedule service
+	entries, err := h.scheduleService.GetUpcomingAppointmentsByEmail(userEmail.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, entries)
 }

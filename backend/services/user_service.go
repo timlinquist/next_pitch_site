@@ -51,9 +51,9 @@ func (s *UserService) CreateUser(user *models.User) error {
 		RETURNING id
 	`,
 		user.Email,
-		user.FirstName.String,
-		user.LastName.String,
-		user.PhoneNumber.String,
+		user.FirstName,
+		user.LastName,
+		user.PhoneNumber,
 		user.IsAdmin,
 		now,
 		now,
@@ -71,7 +71,7 @@ func (s *UserService) CreateUser(user *models.User) error {
 func (s *UserService) IsAdmin(email string) (bool, error) {
 	var isAdmin bool
 	err := s.db.QueryRow(`
-		SELECT is_admin
+		SELECT admin
 		FROM users
 		WHERE email = $1
 	`, email).Scan(&isAdmin)

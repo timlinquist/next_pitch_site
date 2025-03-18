@@ -30,17 +30,18 @@ func TestGetUserByEmail(t *testing.T) {
 			email: "test@example.com",
 			setupMock: func() {
 				mock.ExpectQuery(`
-					SELECT id, email, name, is_admin, created_at, updated_at
+					SELECT id, email, first_name, last_name, phone_number, admin, created_at, updated_at
 					FROM users
 					WHERE email = \$1
 				`).WithArgs("test@example.com").
-					WillReturnRows(sqlmock.NewRows([]string{"id", "email", "name", "is_admin", "created_at", "updated_at"}).
-						AddRow(1, "test@example.com", "Test User", false, time.Now(), time.Now()))
+					WillReturnRows(sqlmock.NewRows([]string{"id", "email", "first_name", "last_name", "phone_number", "admin", "created_at", "updated_at"}).
+						AddRow(1, "test@example.com", "Test", "User", sql.NullString{}, false, time.Now(), time.Now()))
 			},
 			expectedUser: &models.User{
-				ID:    1,
-				Email: "test@example.com",
-				Name:  "Test User",
+				ID:        1,
+				Email:     "test@example.com",
+				FirstName: sql.NullString{String: "Test", Valid: true},
+				LastName:  sql.NullString{String: "User", Valid: true},
 			},
 		},
 		{
@@ -48,7 +49,7 @@ func TestGetUserByEmail(t *testing.T) {
 			email: "nonexistent@example.com",
 			setupMock: func() {
 				mock.ExpectQuery(`
-					SELECT id, email, name, is_admin, created_at, updated_at
+					SELECT id, email, first_name, last_name, phone_number, admin, created_at, updated_at
 					FROM users
 					WHERE email = \$1
 				`).WithArgs("nonexistent@example.com").
@@ -75,7 +76,8 @@ func TestGetUserByEmail(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedUser.ID, user.ID)
 			assert.Equal(t, tt.expectedUser.Email, user.Email)
-			assert.Equal(t, tt.expectedUser.Name, user.Name)
+			assert.Equal(t, tt.expectedUser.FirstName, user.FirstName)
+			assert.Equal(t, tt.expectedUser.LastName, user.LastName)
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
@@ -98,32 +100,34 @@ func TestCreateUser(t *testing.T) {
 		{
 			name: "successful user creation",
 			user: &models.User{
-				Email:   "test@example.com",
-				Name:    "Test User",
-				IsAdmin: false,
+				Email:     "test@example.com",
+				FirstName: sql.NullString{String: "Test", Valid: true},
+				LastName:  sql.NullString{String: "User", Valid: true},
+				IsAdmin:   false,
 			},
 			setupMock: func() {
 				mock.ExpectQuery(`
-					INSERT INTO users \(email, name, is_admin, created_at, updated_at\)
-					VALUES \(\$1, \$2, \$3, \$4, \$5\)
+					INSERT INTO users \(email, first_name, last_name, phone_number, admin, created_at, updated_at\)
+					VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)
 					RETURNING id
-				`).WithArgs("test@example.com", "Test User", false, sqlmock.AnyArg(), sqlmock.AnyArg()).
+				`).WithArgs("test@example.com", "Test", "User", sql.NullString{}, false, sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 			},
 		},
 		{
 			name: "duplicate email",
 			user: &models.User{
-				Email:   "existing@example.com",
-				Name:    "Test User",
-				IsAdmin: false,
+				Email:     "existing@example.com",
+				FirstName: sql.NullString{String: "Test", Valid: true},
+				LastName:  sql.NullString{String: "User", Valid: true},
+				IsAdmin:   false,
 			},
 			setupMock: func() {
 				mock.ExpectQuery(`
-					INSERT INTO users \(email, name, is_admin, created_at, updated_at\)
-					VALUES \(\$1, \$2, \$3, \$4, \$5\)
+					INSERT INTO users \(email, first_name, last_name, phone_number, admin, created_at, updated_at\)
+					VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)
 					RETURNING id
-				`).WithArgs("existing@example.com", "Test User", false, sqlmock.AnyArg(), sqlmock.AnyArg()).
+				`).WithArgs("existing@example.com", "Test", "User", sql.NullString{}, false, sqlmock.AnyArg(), sqlmock.AnyArg()).
 					WillReturnError(sql.ErrNoRows)
 			},
 			expectedError: "sql: no rows in result set",
@@ -171,11 +175,11 @@ func TestIsAdmin(t *testing.T) {
 			email: "admin@example.com",
 			setupMock: func() {
 				mock.ExpectQuery(`
-					SELECT is_admin
+					SELECT admin
 					FROM users
 					WHERE email = \$1
 				`).WithArgs("admin@example.com").
-					WillReturnRows(sqlmock.NewRows([]string{"is_admin"}).AddRow(true))
+					WillReturnRows(sqlmock.NewRows([]string{"admin"}).AddRow(true))
 			},
 			expectedAdmin: true,
 		},
@@ -184,11 +188,11 @@ func TestIsAdmin(t *testing.T) {
 			email: "user@example.com",
 			setupMock: func() {
 				mock.ExpectQuery(`
-					SELECT is_admin
+					SELECT admin
 					FROM users
 					WHERE email = \$1
 				`).WithArgs("user@example.com").
-					WillReturnRows(sqlmock.NewRows([]string{"is_admin"}).AddRow(false))
+					WillReturnRows(sqlmock.NewRows([]string{"admin"}).AddRow(false))
 			},
 			expectedAdmin: false,
 		},
@@ -197,7 +201,7 @@ func TestIsAdmin(t *testing.T) {
 			email: "nonexistent@example.com",
 			setupMock: func() {
 				mock.ExpectQuery(`
-					SELECT is_admin
+					SELECT admin
 					FROM users
 					WHERE email = \$1
 				`).WithArgs("nonexistent@example.com").

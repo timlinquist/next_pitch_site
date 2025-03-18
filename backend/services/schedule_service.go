@@ -24,9 +24,10 @@ func NewScheduleService(db DB) *ScheduleService {
 
 func (s *ScheduleService) GetScheduleEntries() ([]models.ScheduleEntry, error) {
 	rows, err := s.db.Query(`
-		SELECT id, title, start_time, end_time, description, user_email
-		FROM schedule_entries
-		ORDER BY start_time ASC
+		SELECT se.id, se.title, se.start_time, se.end_time, se.description, u.email as user_email
+		FROM schedule_entries se
+		JOIN users u ON se.user_id = u.id
+		ORDER BY se.start_time ASC
 	`)
 	if err != nil {
 		return nil, err
@@ -64,12 +65,19 @@ func (s *ScheduleService) CreateScheduleEntry(entry *models.ScheduleEntry, userE
 		return errors.New("event overlaps with existing events")
 	}
 
+	// Get user ID from email
+	var userID int
+	err = s.db.QueryRow("SELECT id FROM users WHERE email = $1", userEmail).Scan(&userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
 	now := time.Now()
 	err = s.db.QueryRow(`
-		INSERT INTO schedule_entries (title, start_time, end_time, description, user_email, created_at, updated_at)
+		INSERT INTO schedule_entries (title, start_time, end_time, description, user_id, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id
-	`, entry.Title, entry.StartTime, entry.EndTime, entry.Description, userEmail, now, now).Scan(&entry.ID)
+	`, entry.Title, entry.StartTime, entry.EndTime, entry.Description, userID, now, now).Scan(&entry.ID)
 
 	if err != nil {
 		return err
@@ -116,13 +124,20 @@ func (s *ScheduleService) UpdateScheduleEntry(entry *models.ScheduleEntry, userE
 		return errors.New("event overlaps with existing events")
 	}
 
+	// Get user ID from email
+	var userID int
+	err = s.db.QueryRow("SELECT id FROM users WHERE email = $1", userEmail).Scan(&userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
 	now := time.Now()
 	err = s.db.QueryRow(`
 		UPDATE schedule_entries
 		SET title = $1, start_time = $2, end_time = $3, description = $4, updated_at = $5
-		WHERE id = $6 AND user_email = $7
+		WHERE id = $6 AND user_id = $7
 		RETURNING id
-	`, entry.Title, entry.StartTime, entry.EndTime, entry.Description, now, entry.ID, userEmail).Scan(&entry.ID)
+	`, entry.Title, entry.StartTime, entry.EndTime, entry.Description, now, entry.ID, userID).Scan(&entry.ID)
 
 	if err == sql.ErrNoRows {
 		return errors.New("schedule entry not found or unauthorized")
@@ -154,10 +169,17 @@ func (s *ScheduleService) checkOverlappingEventsForUpdate(entryID int, startTime
 }
 
 func (s *ScheduleService) DeleteScheduleEntry(id int64, userEmail string) error {
+	// Get user ID from email
+	var userID int
+	err := s.db.QueryRow("SELECT id FROM users WHERE email = $1", userEmail).Scan(&userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
 	result, err := s.db.Exec(`
 		DELETE FROM schedule_entries
-		WHERE id = $1 AND user_email = $2
-	`, id, userEmail)
+		WHERE id = $1 AND user_id = $2
+	`, id, userID)
 
 	if err != nil {
 		return err
@@ -173,4 +195,67 @@ func (s *ScheduleService) DeleteScheduleEntry(id int64, userEmail string) error 
 	}
 
 	return nil
+}
+
+func (s *ScheduleService) GetScheduleEntry(id int64) (*models.ScheduleEntry, error) {
+	var entry models.ScheduleEntry
+	err := s.db.QueryRow(`
+		SELECT se.id, se.title, se.start_time, se.end_time, se.description, u.email as user_email, se.created_at, se.updated_at
+		FROM schedule_entries se
+		JOIN users u ON se.user_id = u.id
+		WHERE se.id = $1
+	`, id).Scan(
+		&entry.ID,
+		&entry.Title,
+		&entry.StartTime,
+		&entry.EndTime,
+		&entry.Description,
+		&entry.UserEmail,
+		&entry.CreatedAt,
+		&entry.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.New("schedule entry not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &entry, nil
+}
+
+func (s *ScheduleService) GetUpcomingAppointmentsByEmail(email string) ([]models.ScheduleEntry, error) {
+	rows, err := s.db.Query(`
+		SELECT se.id, se.title, se.description, se.start_time, se.end_time, u.email as user_email, se.created_at, se.updated_at
+		FROM schedule_entries se
+		JOIN users u ON se.user_id = u.id
+		WHERE u.email = $1 AND se.start_time >= NOW()
+		ORDER BY se.start_time ASC
+	`, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []models.ScheduleEntry
+	for rows.Next() {
+		var entry models.ScheduleEntry
+		err := rows.Scan(
+			&entry.ID,
+			&entry.Title,
+			&entry.Description,
+			&entry.StartTime,
+			&entry.EndTime,
+			&entry.UserEmail,
+			&entry.CreatedAt,
+			&entry.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+
+	return entries, nil
 }
