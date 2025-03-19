@@ -12,9 +12,9 @@ type ContactController struct {
 	emailService *services.EmailService
 }
 
-func NewContactController() *ContactController {
+func NewContactController(emailService *services.EmailService) *ContactController {
 	return &ContactController{
-		emailService: services.NewEmailService(),
+		emailService: emailService,
 	}
 }
 

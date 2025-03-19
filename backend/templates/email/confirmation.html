@@ -1,0 +1,8 @@
+<h2>Appointment Confirmation</h2>
+<p>Your appointment has been scheduled:</p>
+<ul>
+    <li><strong>Title:</strong> {{.Title}}</li>
+    <li><strong>Date:</strong> {{.StartTime.Format "January 2, 2006"}}</li>
+    <li><strong>Time:</strong> {{.StartTime.Format "3:04 PM"}} - {{.EndTime.Format "3:04 PM"}}</li>
+</ul>
+<p>Please arrive on time for your appointment. If you need to reschedule, please do so at least 24 hours in advance.</p> 

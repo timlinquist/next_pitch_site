@@ -1,0 +1,8 @@
+<h2>Appointment Cancellation Confirmation</h2>
+<p>Your appointment has been cancelled:</p>
+<ul>
+    <li><strong>Title:</strong> {{.Title}}</li>
+    <li><strong>Date:</strong> {{.StartTime.Format "January 2, 2006"}}</li>
+    <li><strong>Time:</strong> {{.StartTime.Format "3:04 PM"}} - {{.EndTime.Format "3:04 PM"}}</li>
+</ul>
+<p>If you need to schedule a new appointment, please visit our scheduling page.</p> 

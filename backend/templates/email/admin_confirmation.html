@@ -1,0 +1,9 @@
+<h2>New Appointment Scheduled</h2>
+<p>A new appointment has been scheduled:</p>
+<ul>
+    <li><strong>Title:</strong> {{.Title}}</li>
+    <li><strong>Client:</strong> {{.UserEmail}}</li>
+    <li><strong>Date:</strong> {{.StartTime.Format "January 2, 2006"}}</li>
+    <li><strong>Time:</strong> {{.StartTime.Format "3:04 PM"}} - {{.EndTime.Format "3:04 PM"}}</li>
+</ul>
+<p>Please review the appointment details and prepare accordingly.</p> 

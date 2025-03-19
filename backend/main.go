@@ -37,10 +37,11 @@ func main() {
 	// Initialize services
 	userService := services.NewUserService(db.DB)
 	scheduleService := services.NewScheduleService(db.DB)
+	emailService := services.NewEmailService()
 
 	// Initialize handlers and controllers
-	scheduleHandler := handlers.NewScheduleHandler(scheduleService, userService)
-	contactController := controllers.NewContactController()
+	scheduleHandler := handlers.NewScheduleHandler(scheduleService, userService, emailService)
+	contactController := controllers.NewContactController(emailService)
 	userController := controllers.NewUserController(userService)
 
 	videoController, err := controllers.NewVideoController()
