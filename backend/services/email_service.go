@@ -1,102 +1,323 @@
 package services
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
+	"html/template"
 	"log"
+	"net/smtp"
 	"os"
+	"path/filepath"
 
-	"gopkg.in/gomail.v2"
 	"nextpitch.com/backend/models"
-	"nextpitch.com/backend/types"
 )
 
+const (
+	AdminEmail = "coachtim@thenextpitch.org"
+)
+
+type EmailType int
+
+func (e EmailType) String() string {
+	return [...]string{
+		"EmailTypeCancellation",
+		"EmailTypeConfirmation",
+		"EmailTypeAdminCancellation",
+		"EmailTypeAdminConfirmation",
+		"EmailTypeContact",
+	}[e]
+}
+
+const (
+	EmailTypeCancellation EmailType = iota
+	EmailTypeConfirmation
+	EmailTypeAdminCancellation
+	EmailTypeAdminConfirmation
+	EmailTypeContact
+)
+
+type EmailData struct {
+	Type     EmailType
+	Data     interface{}
+	To       string
+	Subject  string
+	Template string
+}
+
 type EmailService struct {
+	smtpHost     string
+	smtpPort     string
 	smtpUsername string
 	smtpPassword string
+	fromEmail    string
+	templates    map[string]*template.Template
+	emailChan    chan EmailData
 }
 
 func NewEmailService() *EmailService {
-	return &EmailService{
+	s := &EmailService{
+		smtpHost:     os.Getenv("SMTP_HOST"),
+		smtpPort:     os.Getenv("SMTP_PORT"),
 		smtpUsername: os.Getenv("SMTP_USERNAME"),
 		smtpPassword: os.Getenv("SMTP_PASSWORD"),
+		fromEmail:    AdminEmail,
+		templates:    make(map[string]*template.Template),
+		emailChan:    make(chan EmailData, 100), // Buffer size of 100
+	}
+
+	// Log SMTP configuration (without sensitive data)
+	log.Printf("[Email] Initializing email service with host: %s, port: %s, from: %s",
+		s.smtpHost, s.smtpPort, s.fromEmail)
+
+	// Load templates
+	templateFiles := map[string]string{
+		"cancellation":       "cancellation.html",
+		"confirmation":       "confirmation.html",
+		"admin_cancellation": "admin_cancellation.html",
+		"admin_confirmation": "admin_confirmation.html",
+		"contact":            "contact.html",
+	}
+
+	// Set template directory path
+	templateDir := filepath.Join("..", "backend", "templates", "email")
+	log.Printf("[Email] Loading templates from: %s", templateDir)
+
+	// List contents of template directory
+	files, err := os.ReadDir(templateDir)
+	if err != nil {
+		log.Printf("[Email] ERROR: Failed to read template directory: %v", err)
+		return s
+	}
+
+	log.Printf("[Email] Found files in template directory:")
+	for _, file := range files {
+		log.Printf("[Email] - %s", file.Name())
+	}
+
+	for name, file := range templateFiles {
+		templatePath := filepath.Join(templateDir, file)
+		log.Printf("[Email] Loading template %s from %s", name, templatePath)
+
+		tmpl, err := template.ParseFiles(templatePath)
+		if err != nil {
+			log.Printf("[Email] ERROR: Failed to parse template %s: %v", name, err)
+			continue
+		}
+		s.templates[name] = tmpl
+		log.Printf("[Email] Successfully loaded template %s", name)
+	}
+
+	// Log loaded templates summary
+	log.Printf("[Email] Loaded %d templates: %v", len(s.templates), getMapKeys(s.templates))
+
+	// Start the email processing worker
+	log.Printf("[Email] Starting email processing worker")
+	go s.processEmails()
+
+	return s
+}
+
+func getMapKeys(m map[string]*template.Template) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (s *EmailService) processEmails() {
+	log.Printf("[Email] Email processing worker started")
+	for data := range s.emailChan {
+		log.Printf("[Email] Processing email - Type: %s, Template: %s, To: %s, Subject: %s",
+			data.Type.String(), data.Template, data.To, data.Subject)
+
+		// Check if required SMTP settings are configured
+		if s.smtpHost == "" || s.smtpPort == "" || s.smtpUsername == "" || s.smtpPassword == "" {
+			log.Printf("[Email] ERROR: SMTP settings not properly configured - Host: %s, Port: %s, Username: %v, Password: %v",
+				s.smtpHost != "", s.smtpPort != "", s.smtpUsername != "", s.smtpPassword != "")
+			continue
+		}
+
+		// Verify template exists
+		if _, ok := s.templates[data.Template]; !ok {
+			log.Printf("[Email] ERROR: Template '%s' not found in available templates: %v",
+				data.Template, getMapKeys(s.templates))
+			continue
+		} else {
+			log.Printf("[Email] Found template '%s' for processing", data.Template)
+		}
+
+		if err := s.sendEmail(data); err != nil {
+			log.Printf("[Email] ERROR: Failed to send email - Type: %s, Template: %s, To: %s, Error: %v",
+				data.Type.String(), data.Template, data.To, err)
+		} else {
+			log.Printf("[Email] Successfully processed and sent email - Type: %s, Template: %s, To: %s",
+				data.Type.String(), data.Template, data.To)
+		}
 	}
 }
 
-func (s *EmailService) SendCustomEmail(config types.EmailConfig) error {
-	if s.smtpUsername == "" {
-		return fmt.Errorf("SMTP_USERNAME environment variable is not set")
-	}
-	if s.smtpPassword == "" {
-		return fmt.Errorf("SMTP_PASSWORD environment variable is not set")
-	}
-
-	log.Printf("[Email] Attempting to send email from %s to %s", config.From, config.To)
-
-	m := gomail.NewMessage()
-	m.SetHeader("From", config.From)
-	m.SetHeader("To", config.To)
-	m.SetHeader("Subject", config.Subject)
-	m.SetBody("text/plain", config.Body)
-
-	d := gomail.NewDialer("smtp.zoho.com", 465, s.smtpUsername, s.smtpPassword)
-	d.TLSConfig = &tls.Config{ServerName: "smtp.zoho.com"}
-
-	if err := d.DialAndSend(m); err != nil {
-		log.Printf("[Email] Failed to send email: %v", err)
-		return fmt.Errorf("failed to send email: %v", err)
-	}
-
-	log.Printf("[Email] Successfully sent email from %s to %s", config.From, config.To)
-	return nil
+func (s *EmailService) QueueEmail(data EmailData) {
+	log.Printf("[Email] Queueing email - Type: %s, Template: %s, To: %s, Subject: %s",
+		data.Type.String(), data.Template, data.To, data.Subject)
+	s.emailChan <- data
+	log.Printf("[Email] Successfully queued email - Type: %s", data.Type.String())
 }
 
 func (s *EmailService) SendContactEmail(form models.ContactForm) error {
-	config := types.EmailConfig{
-		From:    form.Email,
-		To:      "coachtim@thenextpitch.org",
-		Subject: fmt.Sprintf("Contact Form: %s", form.Subject),
-		Body: fmt.Sprintf(`
-New Contact Form Submission
+	log.Printf("[Email] Preparing to send contact form email from %s", form.Email)
 
-Name: %s
-Email: %s
-Subject: %s
+	s.QueueEmail(EmailData{
+		Type:     EmailTypeContact,
+		Data:     form,
+		To:       AdminEmail,
+		Subject:  fmt.Sprintf("Contact Form: %s", form.Subject),
+		Template: "contact",
+	})
 
-Message:
-%s
-		`, form.Name, form.Email, form.Subject, form.Message),
-	}
-
-	return s.SendCustomEmail(config)
+	log.Printf("[Email] Successfully queued contact form email from %s", form.Email)
+	return nil
 }
 
 func (s *EmailService) SendAppointmentCancellationEmail(entry *models.ScheduleEntry) error {
-	log.Printf("[Email] Preparing cancellation email for appointment %d", entry.ID)
+	log.Printf("[Email] Preparing to send cancellation email for appointment %d", entry.ID)
 
-	config := types.EmailConfig{
-		From:    "coachtim@thenextpitch.org",
-		To:      entry.UserEmail,
-		Subject: "Appointment Cancellation - The Next Pitch",
-		Body: fmt.Sprintf(`
-Dear %s,
+	// Queue user email
+	s.QueueEmail(EmailData{
+		Type:     EmailTypeCancellation,
+		Data:     entry,
+		To:       entry.UserEmail,
+		Subject:  "Appointment Cancellation Confirmation",
+		Template: "cancellation",
+	})
 
-Your appointment scheduled for %s has been cancelled.
+	// Queue admin email
+	s.QueueEmail(EmailData{
+		Type:     EmailTypeAdminCancellation,
+		Data:     entry,
+		To:       AdminEmail,
+		Subject:  "Appointment Cancellation Notification",
+		Template: "admin_cancellation",
+	})
 
-Appointment Details:
-Title: %s
-Date: %s
-Time: %s - %s
+	log.Printf("[Email] Successfully queued cancellation emails for appointment %d", entry.ID)
+	return nil
+}
 
-If you would like to schedule a new appointment, please visit our website.
+func (s *EmailService) SendAppointmentConfirmationEmail(entry *models.ScheduleEntry) error {
+	log.Printf("[Email] Preparing to send confirmation email for appointment %d", entry.ID)
 
-Best regards,
-Coach Tim
-		`, entry.UserEmail, entry.StartTime.Format("January 2, 2006"), entry.Title,
-			entry.StartTime.Format("January 2, 2006"),
-			entry.StartTime.Format("3:04 PM"),
-			entry.EndTime.Format("3:04 PM")),
+	// Queue user email
+	s.QueueEmail(EmailData{
+		Type:     EmailTypeConfirmation,
+		Data:     entry,
+		To:       entry.UserEmail,
+		Subject:  "Appointment Confirmation",
+		Template: "confirmation",
+	})
+
+	// Queue admin email
+	s.QueueEmail(EmailData{
+		Type:     EmailTypeAdminConfirmation,
+		Data:     entry,
+		To:       AdminEmail,
+		Subject:  "New Appointment Scheduled",
+		Template: "admin_confirmation",
+	})
+
+	log.Printf("[Email] Successfully queued confirmation emails for appointment %d", entry.ID)
+	return nil
+}
+
+func (s *EmailService) sendEmail(data EmailData) error {
+	// Log template lookup
+	tmpl, ok := s.templates[data.Template]
+	if !ok {
+		return fmt.Errorf("template %s not found in available templates: %v",
+			data.Template, getMapKeys(s.templates))
+	}
+	log.Printf("[Email] Found template %s, executing with data", data.Template)
+
+	// Execute template
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data.Data); err != nil {
+		return fmt.Errorf("error executing template %s: %v", data.Template, err)
+	}
+	log.Printf("[Email] Successfully executed template %s", data.Template)
+
+	// Format From header with name and email
+	fromHeader := fmt.Sprintf("The Next Pitch <%s>", s.fromEmail)
+
+	// Create email message
+	message := []byte("To: " + data.To + "\r\n" +
+		"From: " + fromHeader + "\r\n" +
+		"Subject: " + data.Subject + "\r\n" +
+		"MIME-version: 1.0;\r\n" +
+		"Content-Type: text/html; charset=\"UTF-8\";\r\n" +
+		"\r\n" +
+		buf.String())
+
+	// Connect to SMTP server
+	log.Printf("[Email] Connecting to SMTP server %s:%s", s.smtpHost, s.smtpPort)
+
+	// Create SMTP client
+	smtpClient, err := smtp.Dial(fmt.Sprintf("%s:%s", s.smtpHost, s.smtpPort))
+	if err != nil {
+		return fmt.Errorf("failed to connect to SMTP server: %v", err)
+	}
+	defer smtpClient.Close()
+
+	// Send EHLO
+	if err = smtpClient.Hello("localhost"); err != nil {
+		return fmt.Errorf("EHLO failed: %v", err)
 	}
 
-	return s.SendCustomEmail(config)
+	// Start TLS
+	if ok, _ := smtpClient.Extension("STARTTLS"); ok {
+		config := &tls.Config{
+			ServerName: s.smtpHost,
+			MinVersion: tls.VersionTLS12,
+		}
+		if err = smtpClient.StartTLS(config); err != nil {
+			return fmt.Errorf("StartTLS failed: %v", err)
+		}
+		log.Printf("[Email] TLS connection established")
+	}
+
+	// Authenticate
+	auth := smtp.PlainAuth("", s.smtpUsername, s.smtpPassword, s.smtpHost)
+	if err = smtpClient.Auth(auth); err != nil {
+		return fmt.Errorf("SMTP authentication failed: %v", err)
+	}
+	log.Printf("[Email] Authentication successful")
+
+	// Set sender and recipient
+	if err = smtpClient.Mail(s.fromEmail); err != nil {
+		return fmt.Errorf("failed to set sender: %v", err)
+	}
+	if err = smtpClient.Rcpt(data.To); err != nil {
+		return fmt.Errorf("failed to set recipient: %v", err)
+	}
+
+	// Send the email body
+	writer, err := smtpClient.Data()
+	if err != nil {
+		return fmt.Errorf("failed to create message writer: %v", err)
+	}
+	defer writer.Close()
+
+	_, err = writer.Write(message)
+	if err != nil {
+		return fmt.Errorf("failed to write message: %v", err)
+	}
+
+	// Close the connection and handle any errors
+	if err = smtpClient.Quit(); err != nil {
+		// Log the error but don't return it since the message was already sent
+		log.Printf("[Email] Warning: Error closing SMTP connection: %v", err)
+	}
+
+	log.Printf("[Email] Successfully sent email to %s", data.To)
+	return nil
 }

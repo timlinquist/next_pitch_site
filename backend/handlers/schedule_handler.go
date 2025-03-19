@@ -14,31 +14,13 @@ type ScheduleHandler struct {
 	scheduleService *services.ScheduleService
 	userService     *services.UserService
 	emailService    *services.EmailService
-	emailChan       chan models.ScheduleEntry
 }
 
-func NewScheduleHandler(scheduleService *services.ScheduleService, userService *services.UserService) *ScheduleHandler {
-	h := &ScheduleHandler{
+func NewScheduleHandler(scheduleService *services.ScheduleService, userService *services.UserService, emailService *services.EmailService) *ScheduleHandler {
+	return &ScheduleHandler{
 		scheduleService: scheduleService,
 		userService:     userService,
-		emailService:    services.NewEmailService(),
-		emailChan:       make(chan models.ScheduleEntry, 100), // Buffer size of 100
-	}
-
-	// Start the email worker
-	go h.processEmails()
-
-	return h
-}
-
-func (h *ScheduleHandler) processEmails() {
-	for entry := range h.emailChan {
-		log.Printf("[Schedule] Processing cancellation email for appointment %d", entry.ID)
-		if err := h.emailService.SendAppointmentCancellationEmail(&entry); err != nil {
-			log.Printf("[Schedule] Error sending cancellation email for appointment %d: %v", entry.ID, err)
-		} else {
-			log.Printf("[Schedule] Successfully sent cancellation email for appointment %d", entry.ID)
-		}
+		emailService:    emailService,
 	}
 }
 
@@ -76,6 +58,11 @@ func (h *ScheduleHandler) CreateScheduleEntry(c *gin.Context) {
 	if err := h.scheduleService.CreateScheduleEntry(&entry, userEmail.(string), isAdmin); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Send confirmation email
+	if err := h.emailService.SendAppointmentConfirmationEmail(&entry); err != nil {
+		log.Printf("[Schedule] Error queueing confirmation email for appointment %d: %v", entry.ID, err)
 	}
 
 	c.JSON(http.StatusCreated, entry)
@@ -143,9 +130,10 @@ func (h *ScheduleHandler) DeleteScheduleEntry(c *gin.Context) {
 		return
 	}
 
-	// Send the entry to the email channel for processing
-	log.Printf("[Schedule] Queueing cancellation email for appointment %d", entry.ID)
-	h.emailChan <- *entry
+	// Send cancellation email
+	if err := h.emailService.SendAppointmentCancellationEmail(entry); err != nil {
+		log.Printf("[Schedule] Error queueing cancellation email for appointment %d: %v", entry.ID, err)
+	}
 
 	c.Status(http.StatusNoContent)
 }
