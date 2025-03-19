@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"testing"
 
 	"nextpitch.com/backend/models"
 )
@@ -18,7 +19,13 @@ type ScheduleFixtures struct {
 	EventToDelete models.ScheduleEntry `json:"event_to_delete"`
 }
 
-func LoadFixtures(t interface{ Fatal(args ...interface{}) }) *ScheduleFixtures {
+type TestDB struct {
+	DB       *sql.DB
+	Fixtures *ScheduleFixtures
+}
+
+// LoadFixtures loads test data from JSON files
+func LoadFixtures(t *testing.T) *ScheduleFixtures {
 	// Get the current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -53,7 +60,8 @@ func LoadFixtures(t interface{ Fatal(args ...interface{}) }) *ScheduleFixtures {
 	return &fixtures
 }
 
-func runMigrations(t interface{ Fatal(args ...interface{}) }, dbname string) {
+// runMigrations runs database migrations
+func runMigrations(t *testing.T, dbname string) {
 	// Get the current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -85,7 +93,8 @@ func runMigrations(t interface{ Fatal(args ...interface{}) }, dbname string) {
 	}
 }
 
-func SetupTestDB(t interface{ Fatal(args ...interface{}) }) *sql.DB {
+// SetupTestDB creates a test database and loads fixtures
+func SetupTestDB(t *testing.T) *TestDB {
 	// Use test database configuration
 	host := "localhost"
 	port := "5432"
@@ -104,19 +113,34 @@ func SetupTestDB(t interface{ Fatal(args ...interface{}) }) *sql.DB {
 	// Run migrations
 	runMigrations(t, dbname)
 
-	// Clean up the test database before each test
-	_, err = testDB.Exec("TRUNCATE TABLE schedule_entries, users CASCADE")
+	// Load fixtures
+	fixtures := LoadFixtures(t)
+
+	return &TestDB{
+		DB:       testDB,
+		Fixtures: fixtures,
+	}
+}
+
+// CleanupTestDB cleans up the test database
+func (tdb *TestDB) CleanupTestDB(t *testing.T) {
+	// Clean up the test database
+	_, err := tdb.DB.Exec("TRUNCATE TABLE schedule_entries, users CASCADE")
 	if err != nil {
 		t.Fatal(fmt.Sprintf("Failed to clean up test database: %v", err))
 	}
-
-	return testDB
 }
 
-func InsertTestData(t interface{ Fatal(args ...interface{}) }, db *sql.DB, entry models.ScheduleEntry) int {
+// Close closes the database connection
+func (tdb *TestDB) Close() error {
+	return tdb.DB.Close()
+}
+
+// InsertTestData inserts a schedule entry into the test database
+func (tdb *TestDB) InsertTestData(t *testing.T, entry models.ScheduleEntry) int {
 	// First, create or get the user
 	var userID int
-	err := db.QueryRow(`
+	err := tdb.DB.QueryRow(`
 		WITH new_user AS (
 			INSERT INTO users (email, first_name, last_name)
 			VALUES ($1, '', '')
@@ -134,7 +158,7 @@ func InsertTestData(t interface{ Fatal(args ...interface{}) }, db *sql.DB, entry
 
 	// Then insert the schedule entry
 	var id int
-	err = db.QueryRow(`
+	err = tdb.DB.QueryRow(`
 		INSERT INTO schedule_entries (title, description, start_time, end_time, user_id)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id

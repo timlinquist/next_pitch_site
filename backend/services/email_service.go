@@ -134,7 +134,7 @@ func (s *EmailService) processEmails() {
 
 		// Check if required SMTP settings are configured
 		if s.smtpHost == "" || s.smtpPort == "" || s.smtpUsername == "" || s.smtpPassword == "" {
-			log.Printf("[Email] ERROR: SMTP settings not properly configured - Host: %s, Port: %s, Username: %v, Password: %v",
+			log.Printf("[Email] ERROR: SMTP settings not properly configured - Host: %v, Port: %v, Username: %v, Password: %v",
 				s.smtpHost != "", s.smtpPort != "", s.smtpUsername != "", s.smtpPassword != "")
 			continue
 		}
