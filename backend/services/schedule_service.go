@@ -97,7 +97,7 @@ func (s *ScheduleService) checkOverlappingEvents(startTime, endTime time.Time) (
 		WHERE (start_time <= $1 AND end_time > $1) OR
 			  (start_time < $2 AND end_time >= $2) OR
 			  (start_time >= $1 AND end_time <= $2)
-	`, endTime, startTime).Scan(&count)
+	`, startTime, endTime).Scan(&count)
 
 	if err != nil {
 		return false, err

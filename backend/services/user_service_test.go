@@ -5,64 +5,53 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 	"nextpitch.com/backend/models"
+	"nextpitch.com/backend/test/helpers"
 )
 
 func TestGetUserByEmail(t *testing.T) {
-	mockDB, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	defer mockDB.Close()
+	// Setup test database and fixtures
+	testDB := helpers.SetupTestDB(t)
+	defer testDB.Close()
 
-	db := &testDB{db: mockDB}
-	service := NewUserService(db)
+	service := NewUserService(testDB.DB)
 
 	tests := []struct {
 		name          string
 		email         string
-		setupMock     func()
 		expectedUser  *models.User
 		expectedError string
 	}{
 		{
 			name:  "successful user retrieval",
 			email: "test@example.com",
-			setupMock: func() {
-				mock.ExpectQuery(`
-					SELECT id, email, first_name, last_name, phone_number, admin, created_at, updated_at
-					FROM users
-					WHERE email = \$1
-				`).WithArgs("test@example.com").
-					WillReturnRows(sqlmock.NewRows([]string{"id", "email", "first_name", "last_name", "phone_number", "admin", "created_at", "updated_at"}).
-						AddRow(1, "test@example.com", "Test", "User", sql.NullString{}, false, time.Now(), time.Now()))
-			},
 			expectedUser: &models.User{
-				ID:        1,
 				Email:     "test@example.com",
 				FirstName: sql.NullString{String: "Test", Valid: true},
 				LastName:  sql.NullString{String: "User", Valid: true},
 			},
 		},
 		{
-			name:  "user not found",
-			email: "nonexistent@example.com",
-			setupMock: func() {
-				mock.ExpectQuery(`
-					SELECT id, email, first_name, last_name, phone_number, admin, created_at, updated_at
-					FROM users
-					WHERE email = \$1
-				`).WithArgs("nonexistent@example.com").
-					WillReturnError(sql.ErrNoRows)
-			},
+			name:          "user not found",
+			email:         "nonexistent@example.com",
 			expectedError: "user not found",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setupMock != nil {
-				tt.setupMock()
+			// Clean up before each test
+			testDB.CleanupTestDB(t)
+
+			// Insert test user if needed
+			if tt.expectedUser != nil {
+				_, err := testDB.DB.Exec(`
+					INSERT INTO users (email, first_name, last_name, admin, created_at, updated_at)
+					VALUES ($1, $2, $3, $4, $5, $6)
+				`, tt.expectedUser.Email, tt.expectedUser.FirstName.String, tt.expectedUser.LastName.String,
+					false, time.Now(), time.Now())
+				assert.NoError(t, err)
 			}
 
 			user, err := service.GetUserByEmail(tt.email)
@@ -74,27 +63,24 @@ func TestGetUserByEmail(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedUser.ID, user.ID)
+			assert.NotZero(t, user.ID)
 			assert.Equal(t, tt.expectedUser.Email, user.Email)
 			assert.Equal(t, tt.expectedUser.FirstName, user.FirstName)
 			assert.Equal(t, tt.expectedUser.LastName, user.LastName)
-			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
 }
 
 func TestCreateUser(t *testing.T) {
-	mockDB, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	defer mockDB.Close()
+	// Setup test database and fixtures
+	testDB := helpers.SetupTestDB(t)
+	defer testDB.Close()
 
-	db := &testDB{db: mockDB}
-	service := NewUserService(db)
+	service := NewUserService(testDB.DB)
 
 	tests := []struct {
 		name          string
 		user          *models.User
-		setupMock     func()
 		expectedError string
 	}{
 		{
@@ -105,39 +91,32 @@ func TestCreateUser(t *testing.T) {
 				LastName:  sql.NullString{String: "User", Valid: true},
 				IsAdmin:   false,
 			},
-			setupMock: func() {
-				mock.ExpectQuery(`
-					INSERT INTO users \(email, first_name, last_name, phone_number, admin, created_at, updated_at\)
-					VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)
-					RETURNING id
-				`).WithArgs("test@example.com", "Test", "User", sql.NullString{}, false, sqlmock.AnyArg(), sqlmock.AnyArg()).
-					WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
-			},
 		},
 		{
 			name: "duplicate email",
 			user: &models.User{
-				Email:     "existing@example.com",
+				Email:     "test@example.com",
 				FirstName: sql.NullString{String: "Test", Valid: true},
 				LastName:  sql.NullString{String: "User", Valid: true},
 				IsAdmin:   false,
 			},
-			setupMock: func() {
-				mock.ExpectQuery(`
-					INSERT INTO users \(email, first_name, last_name, phone_number, admin, created_at, updated_at\)
-					VALUES \(\$1, \$2, \$3, \$4, \$5, \$6, \$7\)
-					RETURNING id
-				`).WithArgs("existing@example.com", "Test", "User", sql.NullString{}, false, sqlmock.AnyArg(), sqlmock.AnyArg()).
-					WillReturnError(sql.ErrNoRows)
-			},
-			expectedError: "sql: no rows in result set",
+			expectedError: "duplicate key value violates unique constraint",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setupMock != nil {
-				tt.setupMock()
+			// Clean up before each test
+			testDB.CleanupTestDB(t)
+
+			// Insert existing user for duplicate email test
+			if tt.expectedError != "" {
+				_, err := testDB.DB.Exec(`
+					INSERT INTO users (email, first_name, last_name, admin, created_at, updated_at)
+					VALUES ($1, $2, $3, $4, $5, $6)
+				`, tt.user.Email, tt.user.FirstName.String, tt.user.LastName.String,
+					tt.user.IsAdmin, time.Now(), time.Now())
+				assert.NoError(t, err)
 			}
 
 			err := service.CreateUser(tt.user)
@@ -150,71 +129,60 @@ func TestCreateUser(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.NotZero(t, tt.user.ID)
-			assert.NoError(t, mock.ExpectationsWereMet())
+
+			// Verify the user was created
+			var count int
+			err = testDB.DB.QueryRow(`
+				SELECT COUNT(*) FROM users WHERE email = $1
+			`, tt.user.Email).Scan(&count)
+			assert.NoError(t, err)
+			assert.Equal(t, 1, count)
 		})
 	}
 }
 
 func TestIsAdmin(t *testing.T) {
-	mockDB, mock, err := sqlmock.New()
-	assert.NoError(t, err)
-	defer mockDB.Close()
+	// Setup test database and fixtures
+	testDB := helpers.SetupTestDB(t)
+	defer testDB.Close()
 
-	db := &testDB{db: mockDB}
-	service := NewUserService(db)
+	service := NewUserService(testDB.DB)
 
 	tests := []struct {
 		name          string
 		email         string
-		setupMock     func()
-		expectedAdmin bool
+		isAdmin       bool
 		expectedError string
 	}{
 		{
-			name:  "admin user",
-			email: "admin@example.com",
-			setupMock: func() {
-				mock.ExpectQuery(`
-					SELECT admin
-					FROM users
-					WHERE email = \$1
-				`).WithArgs("admin@example.com").
-					WillReturnRows(sqlmock.NewRows([]string{"admin"}).AddRow(true))
-			},
-			expectedAdmin: true,
+			name:    "admin user",
+			email:   "admin@example.com",
+			isAdmin: true,
 		},
 		{
-			name:  "non-admin user",
-			email: "user@example.com",
-			setupMock: func() {
-				mock.ExpectQuery(`
-					SELECT admin
-					FROM users
-					WHERE email = \$1
-				`).WithArgs("user@example.com").
-					WillReturnRows(sqlmock.NewRows([]string{"admin"}).AddRow(false))
-			},
-			expectedAdmin: false,
+			name:    "non-admin user",
+			email:   "user@example.com",
+			isAdmin: false,
 		},
 		{
-			name:  "user not found",
-			email: "nonexistent@example.com",
-			setupMock: func() {
-				mock.ExpectQuery(`
-					SELECT admin
-					FROM users
-					WHERE email = \$1
-				`).WithArgs("nonexistent@example.com").
-					WillReturnError(sql.ErrNoRows)
-			},
+			name:          "user not found",
+			email:         "nonexistent@example.com",
 			expectedError: "user not found",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setupMock != nil {
-				tt.setupMock()
+			// Clean up before each test
+			testDB.CleanupTestDB(t)
+
+			// Insert test user if needed
+			if tt.expectedError == "" {
+				_, err := testDB.DB.Exec(`
+					INSERT INTO users (email, first_name, last_name, admin, created_at, updated_at)
+					VALUES ($1, $2, $3, $4, $5, $6)
+				`, tt.email, "Test", "User", tt.isAdmin, time.Now(), time.Now())
+				assert.NoError(t, err)
 			}
 
 			isAdmin, err := service.IsAdmin(tt.email)
@@ -226,8 +194,7 @@ func TestIsAdmin(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedAdmin, isAdmin)
-			assert.NoError(t, mock.ExpectationsWereMet())
+			assert.Equal(t, tt.isAdmin, isAdmin)
 		})
 	}
 }

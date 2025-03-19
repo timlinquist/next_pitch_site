@@ -19,14 +19,14 @@ func TestGetScheduleEntries(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	// Load fixtures
-	fixtures := helpers.LoadFixtures(t)
+	// Clean up before test
+	testDB.CleanupTestDB(t)
 
 	// Insert test data
-	helpers.InsertTestData(t, testDB, fixtures.TestEvent)
+	testDB.InsertTestData(t, testDB.Fixtures.TestEvent)
 
 	// Create controller with test DB
-	sc := &ScheduleController{db: testDB}
+	sc := &ScheduleController{db: testDB.DB}
 
 	// Setup Gin router
 	w := httptest.NewRecorder()
@@ -42,7 +42,7 @@ func TestGetScheduleEntries(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &entries)
 	assert.NoError(t, err)
 	assert.Len(t, entries, 1)
-	assert.Equal(t, fixtures.TestEvent.Title, entries[0].Title)
+	assert.Equal(t, testDB.Fixtures.TestEvent.Title, entries[0].Title)
 }
 
 func TestCreateScheduleEntry(t *testing.T) {
@@ -50,13 +50,13 @@ func TestCreateScheduleEntry(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	// Load fixtures
-	fixtures := helpers.LoadFixtures(t)
+	// Clean up before test
+	testDB.CleanupTestDB(t)
 
-	sc := &ScheduleController{db: testDB}
+	sc := &ScheduleController{db: testDB.DB}
 
 	// Convert entry to JSON
-	jsonData, err := json.Marshal(fixtures.NewEvent)
+	jsonData, err := json.Marshal(testDB.Fixtures.NewEvent)
 	assert.NoError(t, err)
 
 	// Setup Gin router
@@ -74,8 +74,8 @@ func TestCreateScheduleEntry(t *testing.T) {
 	var response models.ScheduleEntry
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
-	assert.Equal(t, fixtures.NewEvent.Title, response.Title)
-	assert.Equal(t, fixtures.NewEvent.Description, response.Description)
+	assert.Equal(t, testDB.Fixtures.NewEvent.Title, response.Title)
+	assert.Equal(t, testDB.Fixtures.NewEvent.Description, response.Description)
 	assert.NotZero(t, response.ID)
 }
 
@@ -84,16 +84,16 @@ func TestUpdateScheduleEntry(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	// Load fixtures
-	fixtures := helpers.LoadFixtures(t)
+	// Clean up before test
+	testDB.CleanupTestDB(t)
 
 	// Insert test data
-	id := helpers.InsertTestData(t, testDB, fixtures.OriginalEvent)
+	id := testDB.InsertTestData(t, testDB.Fixtures.OriginalEvent)
 
-	sc := &ScheduleController{db: testDB}
+	sc := &ScheduleController{db: testDB.DB}
 
 	// Create update data
-	updatedEvent := fixtures.OriginalEvent
+	updatedEvent := testDB.Fixtures.OriginalEvent
 	updatedEvent.ID = id
 	updatedEvent.Title = "Updated Event"
 	updatedEvent.Description = "Updated Description"
@@ -127,13 +127,13 @@ func TestDeleteScheduleEntry(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	// Load fixtures
-	fixtures := helpers.LoadFixtures(t)
+	// Clean up before test
+	testDB.CleanupTestDB(t)
 
 	// Insert test data
-	id := helpers.InsertTestData(t, testDB, fixtures.EventToDelete)
+	id := testDB.InsertTestData(t, testDB.Fixtures.EventToDelete)
 
-	sc := &ScheduleController{db: testDB}
+	sc := &ScheduleController{db: testDB.DB}
 
 	// Setup Gin router
 	w := httptest.NewRecorder()
@@ -148,7 +148,7 @@ func TestDeleteScheduleEntry(t *testing.T) {
 
 	// Verify deletion
 	var count int
-	err := testDB.QueryRow("SELECT COUNT(*) FROM schedule_entries").Scan(&count)
+	err := testDB.DB.QueryRow("SELECT COUNT(*) FROM schedule_entries").Scan(&count)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
 }
