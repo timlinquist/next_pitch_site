@@ -299,7 +299,7 @@ const Schedule = () => {
     if (!isAuthenticated) {
         return (
             <div className="container">
-                <p>Please log in to schedule appointments</p>
+                <p>Please login or signup to schedule appointments</p>
                 <button onClick={() => loginWithRedirect({ appState: { returnTo: '/schedule' } })} className="btn">Log In</button>
             </div>
         );
