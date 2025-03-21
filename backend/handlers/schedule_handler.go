@@ -37,26 +37,40 @@ func (h *ScheduleHandler) GetScheduleEntries(c *gin.Context) {
 func (h *ScheduleHandler) CreateScheduleEntry(c *gin.Context) {
 	var entry models.ScheduleEntry
 	if err := c.ShouldBindJSON(&entry); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data: " + err.Error()})
 		return
 	}
 
 	// Get user email from context
 	userEmail, exists := c.Get("user_email")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
 
 	// Check if user is admin
 	isAdmin, err := h.userService.IsAdmin(userEmail.(string))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		if err.Error() == "user not found" {
+			// Create a new user and try again
+			user := &models.User{
+				Email:   userEmail.(string),
+				Name:    "", // Empty name for now
+				IsAdmin: false,
+			}
+			if err := h.userService.CreateUser(user); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user: " + err.Error()})
+				return
+			}
+			isAdmin = false // New users are not admins by default
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check admin status: " + err.Error()})
+			return
+		}
 	}
 
 	if err := h.scheduleService.CreateScheduleEntry(&entry, userEmail.(string), isAdmin); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to create schedule entry: " + err.Error()})
 		return
 	}
 

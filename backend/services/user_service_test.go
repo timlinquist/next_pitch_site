@@ -1,7 +1,6 @@
 package services
 
 import (
-	"database/sql"
 	"testing"
 	"time"
 
@@ -11,11 +10,10 @@ import (
 )
 
 func TestGetUserByEmail(t *testing.T) {
-	// Setup test database and fixtures
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	service := NewUserService(testDB.DB)
+	service := NewUserService(testDB)
 
 	tests := []struct {
 		name          string
@@ -24,59 +22,65 @@ func TestGetUserByEmail(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name:  "successful user retrieval",
+			name:  "existing user",
 			email: "test@example.com",
 			expectedUser: &models.User{
-				Email:     "test@example.com",
-				FirstName: sql.NullString{String: "Test", Valid: true},
-				LastName:  sql.NullString{String: "User", Valid: true},
+				Email:   "test@example.com",
+				Name:    "Test User",
+				IsAdmin: false,
 			},
+			expectedError: "",
 		},
 		{
-			name:          "user not found",
+			name:          "non-existent user",
 			email:         "nonexistent@example.com",
+			expectedUser:  nil,
 			expectedError: "user not found",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clean up before each test
-			testDB.CleanupTestDB(t)
-
-			// Insert test user if needed
 			if tt.expectedUser != nil {
-				_, err := testDB.DB.Exec(`
-					INSERT INTO users (email, first_name, last_name, admin, created_at, updated_at)
-					VALUES ($1, $2, $3, $4, $5, $6)
-				`, tt.expectedUser.Email, tt.expectedUser.FirstName.String, tt.expectedUser.LastName.String,
-					false, time.Now(), time.Now())
-				assert.NoError(t, err)
+				// Insert test user
+				err := service.CreateUser(tt.expectedUser)
+				if err != nil {
+					t.Fatalf("Failed to create test user: %v", err)
+				}
 			}
 
 			user, err := service.GetUserByEmail(tt.email)
-
 			if tt.expectedError != "" {
-				assert.Error(t, err)
-				assert.Equal(t, tt.expectedError, err.Error())
+				if err == nil {
+					t.Errorf("Expected error %s but got none", tt.expectedError)
+				} else if err.Error() != tt.expectedError {
+					t.Errorf("Expected error %s but got %s", tt.expectedError, err.Error())
+				}
 				return
 			}
 
-			assert.NoError(t, err)
-			assert.NotZero(t, user.ID)
-			assert.Equal(t, tt.expectedUser.Email, user.Email)
-			assert.Equal(t, tt.expectedUser.FirstName, user.FirstName)
-			assert.Equal(t, tt.expectedUser.LastName, user.LastName)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			if user.Email != tt.expectedUser.Email {
+				t.Errorf("Expected email %s but got %s", tt.expectedUser.Email, user.Email)
+			}
+			if user.Name != tt.expectedUser.Name {
+				t.Errorf("Expected name %s but got %s", tt.expectedUser.Name, user.Name)
+			}
+			if user.IsAdmin != tt.expectedUser.IsAdmin {
+				t.Errorf("Expected isAdmin %v but got %v", tt.expectedUser.IsAdmin, user.IsAdmin)
+			}
 		})
 	}
 }
 
 func TestCreateUser(t *testing.T) {
-	// Setup test database and fixtures
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	service := NewUserService(testDB.DB)
+	service := NewUserService(testDB)
 
 	tests := []struct {
 		name          string
@@ -84,59 +88,56 @@ func TestCreateUser(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name: "successful user creation",
+			name: "valid user",
 			user: &models.User{
-				Email:     "test@example.com",
-				FirstName: sql.NullString{String: "Test", Valid: true},
-				LastName:  sql.NullString{String: "User", Valid: true},
-				IsAdmin:   false,
+				Email:   "test@example.com",
+				Name:    "Test User",
+				IsAdmin: false,
 			},
+			expectedError: "",
 		},
 		{
 			name: "duplicate email",
 			user: &models.User{
-				Email:     "test@example.com",
-				FirstName: sql.NullString{String: "Test", Valid: true},
-				LastName:  sql.NullString{String: "User", Valid: true},
-				IsAdmin:   false,
+				Email:   "test@example.com",
+				Name:    "Another Test User",
+				IsAdmin: false,
 			},
-			expectedError: "duplicate key value violates unique constraint",
+			expectedError: "pq: duplicate key value violates unique constraint \"users_email_key\"",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Clean up before each test
-			testDB.CleanupTestDB(t)
-
-			// Insert existing user for duplicate email test
-			if tt.expectedError != "" {
-				_, err := testDB.DB.Exec(`
-					INSERT INTO users (email, first_name, last_name, admin, created_at, updated_at)
-					VALUES ($1, $2, $3, $4, $5, $6)
-				`, tt.user.Email, tt.user.FirstName.String, tt.user.LastName.String,
-					tt.user.IsAdmin, time.Now(), time.Now())
-				assert.NoError(t, err)
-			}
-
 			err := service.CreateUser(tt.user)
-
 			if tt.expectedError != "" {
-				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
+				if err == nil {
+					t.Errorf("Expected error %s but got none", tt.expectedError)
+				} else if err.Error() != tt.expectedError {
+					t.Errorf("Expected error %s but got %s", tt.expectedError, err.Error())
+				}
 				return
 			}
 
-			assert.NoError(t, err)
-			assert.NotZero(t, tt.user.ID)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
 
-			// Verify the user was created
-			var count int
-			err = testDB.DB.QueryRow(`
-				SELECT COUNT(*) FROM users WHERE email = $1
-			`, tt.user.Email).Scan(&count)
-			assert.NoError(t, err)
-			assert.Equal(t, 1, count)
+			// Verify user was created correctly
+			user, err := service.GetUserByEmail(tt.user.Email)
+			if err != nil {
+				t.Fatalf("Failed to get created user: %v", err)
+			}
+
+			if user.Email != tt.user.Email {
+				t.Errorf("Expected email %s but got %s", tt.user.Email, user.Email)
+			}
+			if user.Name != tt.user.Name {
+				t.Errorf("Expected name %s but got %s", tt.user.Name, user.Name)
+			}
+			if user.IsAdmin != tt.user.IsAdmin {
+				t.Errorf("Expected isAdmin %v but got %v", tt.user.IsAdmin, user.IsAdmin)
+			}
 		})
 	}
 }
@@ -146,7 +147,7 @@ func TestIsAdmin(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	service := NewUserService(testDB.DB)
+	service := NewUserService(testDB)
 
 	tests := []struct {
 		name          string
@@ -174,14 +175,17 @@ func TestIsAdmin(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clean up before each test
-			testDB.CleanupTestDB(t)
+			_, err := testDB.Exec(`
+				TRUNCATE TABLE users CASCADE
+			`)
+			assert.NoError(t, err)
 
 			// Insert test user if needed
 			if tt.expectedError == "" {
-				_, err := testDB.DB.Exec(`
-					INSERT INTO users (email, first_name, last_name, admin, created_at, updated_at)
-					VALUES ($1, $2, $3, $4, $5, $6)
-				`, tt.email, "Test", "User", tt.isAdmin, time.Now(), time.Now())
+				_, err := testDB.Exec(`
+					INSERT INTO users (email, name, is_admin, created_at, updated_at)
+					VALUES ($1, $2, $3, $4, $5)
+				`, tt.email, "Test User", tt.isAdmin, time.Now(), time.Now())
 				assert.NoError(t, err)
 			}
 

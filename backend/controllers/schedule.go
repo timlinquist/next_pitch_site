@@ -1,56 +1,31 @@
 package controllers
 
 import (
-	"database/sql"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"nextpitch.com/backend/db"
 	"nextpitch.com/backend/models"
+	"nextpitch.com/backend/services"
 )
 
 type ScheduleController struct {
-	db *sql.DB
+	scheduleService *services.ScheduleService
+	userService     *services.UserService
 }
 
-func NewScheduleController() *ScheduleController {
+func NewScheduleController(scheduleService *services.ScheduleService, userService *services.UserService) *ScheduleController {
 	return &ScheduleController{
-		db: db.DB,
+		scheduleService: scheduleService,
+		userService:     userService,
 	}
 }
 
 func (sc *ScheduleController) GetScheduleEntries(c *gin.Context) {
-	rows, err := sc.db.Query(`
-		SELECT se.id, se.title, se.description, se.start_time, se.end_time, 
-			   se.created_at, se.updated_at, u.email
-		FROM schedule_entries se
-		LEFT JOIN users u ON se.user_id = u.id
-		ORDER BY se.start_time ASC
-	`)
+	entries, err := sc.scheduleService.GetScheduleEntries()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch schedule entries"})
 		return
-	}
-	defer rows.Close()
-
-	var entries []models.ScheduleEntry
-	for rows.Next() {
-		var entry models.ScheduleEntry
-		var email sql.NullString
-		err := rows.Scan(
-			&entry.ID, &entry.Title, &entry.Description,
-			&entry.StartTime, &entry.EndTime,
-			&entry.CreatedAt, &entry.UpdatedAt,
-			&email,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan schedule entry"})
-			return
-		}
-		if email.Valid {
-			entry.UserEmail = email.String
-		}
-		entries = append(entries, entry)
 	}
 
 	c.JSON(http.StatusOK, entries)
@@ -63,35 +38,29 @@ func (sc *ScheduleController) CreateScheduleEntry(c *gin.Context) {
 		return
 	}
 
-	// Get or create user by email
-	var userID int
-	err := sc.db.QueryRow(`
-		WITH new_user AS (
-			INSERT INTO users (email, first_name, last_name)
-			VALUES ($1, '', '') -- Placeholder names, can be updated later
-			ON CONFLICT (email) DO NOTHING
-			RETURNING id
-		)
-		SELECT id FROM new_user
-		UNION ALL
-		SELECT id FROM users WHERE email = $1
-		LIMIT 1
-	`, entry.UserEmail).Scan(&userID)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process user"})
+	// Get user email from context
+	userEmail, exists := c.Get("user_email")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User email not found in context"})
 		return
 	}
 
-	err = sc.db.QueryRow(`
-		INSERT INTO schedule_entries (title, description, start_time, end_time, user_id)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at, updated_at
-	`, entry.Title, entry.Description, entry.StartTime, entry.EndTime, userID).
-		Scan(&entry.ID, &entry.CreatedAt, &entry.UpdatedAt)
-
+	// Check if user is admin
+	isAdmin, err := sc.userService.IsAdmin(userEmail.(string))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create schedule entry"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user permissions"})
+		return
+	}
+
+	err = sc.scheduleService.CreateScheduleEntry(&entry, userEmail.(string), isAdmin)
+	if err != nil {
+		switch err.Error() {
+		case "event duration exceeds maximum allowed duration for non-admin users",
+			"event overlaps with existing events":
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
 		return
 	}
 
@@ -100,26 +69,45 @@ func (sc *ScheduleController) CreateScheduleEntry(c *gin.Context) {
 
 func (sc *ScheduleController) UpdateScheduleEntry(c *gin.Context) {
 	id := c.Param("id")
+	entryID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
+		return
+	}
+
 	var entry models.ScheduleEntry
 	if err := c.ShouldBindJSON(&entry); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	err := sc.db.QueryRow(`
-		UPDATE schedule_entries 
-		SET title = $1, description = $2, start_time = $3, end_time = $4
-		WHERE id = $5
-		RETURNING id, created_at, updated_at
-	`, entry.Title, entry.Description, entry.StartTime, entry.EndTime, id).
-		Scan(&entry.ID, &entry.CreatedAt, &entry.UpdatedAt)
+	entry.ID = int(entryID)
 
+	// Get user email from context
+	userEmail, exists := c.Get("user_email")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User email not found in context"})
+		return
+	}
+
+	// Check if user is admin
+	isAdmin, err := sc.userService.IsAdmin(userEmail.(string))
 	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Schedule entry not found"})
-			return
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user permissions"})
+		return
+	}
+
+	err = sc.scheduleService.UpdateScheduleEntry(&entry, userEmail.(string), isAdmin)
+	if err != nil {
+		switch err.Error() {
+		case "schedule entry not found or unauthorized":
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		case "event duration exceeds maximum allowed duration for non-admin users",
+			"event overlaps with existing events":
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update schedule entry"})
 		return
 	}
 
@@ -128,20 +116,27 @@ func (sc *ScheduleController) UpdateScheduleEntry(c *gin.Context) {
 
 func (sc *ScheduleController) DeleteScheduleEntry(c *gin.Context) {
 	id := c.Param("id")
-	result, err := sc.db.Exec("DELETE FROM schedule_entries WHERE id = $1", id)
+	entryID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete schedule entry"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format"})
 		return
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get rows affected"})
+	// Get user email from context
+	userEmail, exists := c.Get("user_email")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User email not found in context"})
 		return
 	}
 
-	if rowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Schedule entry not found"})
+	err = sc.scheduleService.DeleteScheduleEntry(entryID, userEmail.(string))
+	if err != nil {
+		switch err.Error() {
+		case "schedule entry not found or unauthorized":
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
 		return
 	}
 
@@ -155,33 +150,10 @@ func (sc *ScheduleController) GetUpcomingAppointmentsByEmail(c *gin.Context) {
 		return
 	}
 
-	rows, err := sc.db.Query(`
-		SELECT se.id, se.title, se.description, se.start_time, se.end_time, 
-			   se.created_at, se.updated_at 
-		FROM schedule_entries se
-		JOIN users u ON se.user_id = u.id
-		WHERE u.email = $1 AND se.start_time >= NOW()
-		ORDER BY se.start_time ASC
-	`, email)
+	entries, err := sc.scheduleService.GetUpcomingAppointmentsByEmail(email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch appointments"})
 		return
-	}
-	defer rows.Close()
-
-	var entries []models.ScheduleEntry
-	for rows.Next() {
-		var entry models.ScheduleEntry
-		err := rows.Scan(
-			&entry.ID, &entry.Title, &entry.Description,
-			&entry.StartTime, &entry.EndTime,
-			&entry.CreatedAt, &entry.UpdatedAt,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan appointment"})
-			return
-		}
-		entries = append(entries, entry)
 	}
 
 	c.JSON(http.StatusOK, entries)

@@ -44,7 +44,7 @@ func main() {
 	contactController := controllers.NewContactController(emailService)
 	userController := controllers.NewUserController(userService)
 
-	videoController, err := controllers.NewVideoController()
+	videoController, err := controllers.NewVideoController(db.DB, userService)
 	if err != nil {
 		fmt.Printf("Error initializing video controller: %v\n", err)
 		os.Exit(1)

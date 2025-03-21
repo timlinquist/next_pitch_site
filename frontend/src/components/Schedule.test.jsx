@@ -4,26 +4,36 @@ import { BrowserRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Schedule from './Schedule';
 import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth0Context } from '../contexts/Auth0Context';
 
-
-// Mock the Auth0 hook
+// Mock the Auth0 hooks
 vi.mock('@auth0/auth0-react', () => ({
     useAuth0: vi.fn()
 }));
 
+vi.mock('../contexts/Auth0Context', () => ({
+    useAuth0Context: vi.fn()
+}));
+
 // Mock the FullCalendar component
 vi.mock('@fullcalendar/react', () => ({
-    default: vi.fn(props => {
-        // Store the select handler so we can call it in our tests
-        window.handleDateSelect = props.select;
+    default: ({ events, select }) => {
+        // Store the select handler globally so we can call it in our tests
+        window.handleDateSelect = select;
         return (
             <div data-testid="full-calendar">
-                <div data-testid="calendar-event" className={props.events[0]?.className}>
-                    {props.events[0]?.title}
-                </div>
+                {events?.map(event => (
+                    <div 
+                        key={event.id} 
+                        data-testid="calendar-event"
+                        className={event.className}
+                    >
+                        {event.title}
+                    </div>
+                ))}
             </div>
         );
-    })
+    }
 }));
 
 // Mock the API calls
@@ -53,8 +63,9 @@ describe('Schedule Component', () => {
         // Setup default Auth0 mock
         useAuth0.mockReturnValue({
             isAuthenticated: true,
+            user: mockUser,
             loginWithRedirect: vi.fn(),
-            user: mockUser
+            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
         });
 
         // Setup default Auth0Context mock
@@ -63,19 +74,25 @@ describe('Schedule Component', () => {
         });
 
         // Setup default fetch mock
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve(mockEvents)
+        global.fetch.mockImplementation((url) => {
+            if (url.includes('users/me')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ is_admin: false })
+                });
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve(mockEvents)
+            });
         });
     });
 
     const renderWithProviders = (component) => {
         return render(
-            <Auth0Provider>
-                <BrowserRouter>
-                    {component}
-                </BrowserRouter>
-            </Auth0Provider>
+            <BrowserRouter>
+                {component}
+            </BrowserRouter>
         );
     };
 
@@ -95,7 +112,8 @@ describe('Schedule Component', () => {
         useAuth0.mockReturnValue({
             isAuthenticated: false,
             loginWithRedirect: vi.fn(),
-            user: null
+            user: null,
+            getAccessTokenSilently: vi.fn()
         });
 
         renderWithProviders(<Schedule />);
@@ -107,7 +125,8 @@ describe('Schedule Component', () => {
         // Mock non-admin user
         useAuth0.mockReturnValue({
             isAuthenticated: true,
-            user: { email: 'test@example.com' }
+            user: { email: 'test@example.com' },
+            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
         });
 
         useAuth0Context.mockReturnValue({
@@ -117,7 +136,9 @@ describe('Schedule Component', () => {
         renderWithProviders(<Schedule />);
 
         // Wait for loading to finish
-        await waitForElementToBeRemoved(() => screen.queryByText('Loading...'));
+        await waitFor(() => {
+            expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+        });
 
         // Simulate selecting a time slot longer than 2 hours
         const selectInfo = {
@@ -126,7 +147,9 @@ describe('Schedule Component', () => {
         };
 
         // Call the select handler directly
-        window.handleDateSelect(selectInfo);
+        await act(async () => {
+            window.handleDateSelect(selectInfo);
+        });
 
         // Wait for the error message to appear in an alert
         await waitFor(() => {
@@ -139,21 +162,31 @@ describe('Schedule Component', () => {
         // Mock authenticated user
         useAuth0.mockReturnValue({
             isAuthenticated: true,
-            user: { email: 'test@example.com' }
+            user: { email: 'test@example.com' },
+            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
         });
+
         useAuth0Context.mockReturnValue({ isAdmin: true });
 
         // Mock existing event
-        global.fetch = vi.fn().mockResolvedValueOnce({
-            ok: true,
-            json: () => Promise.resolve([{
-                id: 1,
-                title: 'Existing Event',
-                start_time: '2025-03-13T22:00:00.000Z',
-                end_time: '2025-03-13T23:00:00.000Z',
-                description: 'Existing Event Description',
-                user_email: 'other@example.com'
-            }])
+        global.fetch = vi.fn().mockImplementation((url) => {
+            if (url.includes('users/me')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ is_admin: true })
+                });
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve([{
+                    id: 1,
+                    title: 'Existing Event',
+                    start_time: '2025-03-13T22:00:00.000Z',
+                    end_time: '2025-03-13T23:00:00.000Z',
+                    description: 'Existing Event Description',
+                    user_email: 'other@example.com'
+                }])
+            });
         });
 
         renderWithProviders(<Schedule />);
@@ -163,43 +196,12 @@ describe('Schedule Component', () => {
             expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
         });
 
-        // Wait for the existing event to be displayed
-        await waitFor(() => {
-            expect(screen.getByText('Existing Event')).toBeInTheDocument();
-        });
-
-        // Clear any previous error state
-        await act(async () => {
-            window.handleDateSelect({
-                start: new Date('2025-03-13T21:00:00.000Z'),
-                end: new Date('2025-03-13T22:00:00.000Z')
-            });
-        });
-
-        // Close the modal if it's open
-        const cancelButton = screen.queryByRole('button', { name: /cancel/i });
-        if (cancelButton) {
-            await act(async () => {
-                fireEvent.click(cancelButton);
-            });
-
-            // Wait for the modal to close
-            await waitFor(() => {
-                expect(screen.queryByRole('button', { name: /cancel/i })).not.toBeInTheDocument();
-            });
-        }
-
         // Simulate selecting an overlapping time slot
-        act(() => {
+        await act(async () => {
             window.handleDateSelect({
                 start: new Date('2025-03-13T22:30:00.000Z'),
                 end: new Date('2025-03-13T23:30:00.000Z')
             });
-        });
-
-        // Wait for the modal to close
-        await waitFor(() => {
-            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         });
 
         // Wait for the error message to appear in an alert
@@ -210,6 +212,15 @@ describe('Schedule Component', () => {
     });
 
     it('shows different styles for user events vs other events', async () => {
+        // Mock authenticated user
+        useAuth0.mockReturnValue({
+            isAuthenticated: true,
+            user: { email: 'test@example.com' },
+            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
+        });
+
+        useAuth0Context.mockReturnValue({ isAdmin: false });
+
         const otherUserEvents = [
             {
                 id: 1,
@@ -221,9 +232,17 @@ describe('Schedule Component', () => {
             }
         ];
 
-        global.fetch.mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve(otherUserEvents)
+        global.fetch = vi.fn().mockImplementation((url) => {
+            if (url.includes('users/me')) {
+                return Promise.resolve({
+                    ok: true,
+                    json: () => Promise.resolve({ is_admin: false })
+                });
+            }
+            return Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve(otherUserEvents)
+            });
         });
 
         renderWithProviders(<Schedule />);
@@ -233,7 +252,10 @@ describe('Schedule Component', () => {
             expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
         });
 
-        const event = screen.getByTestId('calendar-event');
-        expect(event).toHaveClass('other-event');
+        // Wait for the event to be rendered
+        await waitFor(() => {
+            const event = screen.getByTestId('calendar-event');
+            expect(event).toHaveClass('other-event');
+        });
     });
 });

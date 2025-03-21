@@ -99,7 +99,8 @@ const Schedule = () => {
                 if (formData) {
                     setInitialEventData({
                         title: formData.title,
-                        description: formData.description
+                        description: formData.description,
+                        recurrence: formData.recurrence || 'none'
                     });
                 }
                 
@@ -125,6 +126,7 @@ const Schedule = () => {
             end: entry.end_time,
             description: isAdmin || entry.user_email === currentUserEmail ? entry.description : '',
             user_email: entry.user_email,
+            recurrence: entry.recurrence,
             className: entry.user_email === currentUserEmail ? 'user-event' : 'other-event',
             editable: isAdmin,
             interactive: isAdmin || entry.user_email === currentUserEmail
@@ -220,7 +222,8 @@ const Schedule = () => {
             start: clickInfo.event.start,
             end: clickInfo.event.end,
             description: clickInfo.event.extendedProps.description,
-            user_email: eventUserEmail
+            user_email: eventUserEmail,
+            recurrence: clickInfo.event.extendedProps.recurrence || 'none'
         });
 
         setIsDetailsModalOpen(true);
@@ -236,15 +239,18 @@ const Schedule = () => {
                     'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    ...eventData,
+                    title: eventData.title,
+                    description: eventData.description,
                     start_time: eventData.start_time.toISOString(),
                     end_time: eventData.end_time.toISOString(),
                     user_email: user.email,
+                    recurrence: eventData.recurrence || 'none'
                 }),
             });
 
             if (!response.ok) {
-                throw new Error('Failed to create event');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create event');
             }
 
             const newEvent = await response.json();
@@ -256,7 +262,7 @@ const Schedule = () => {
             setInitialEventData(null);
         } catch (error) {
             console.error('Error creating event:', error);
-            setError('Failed to create event');
+            setError(error.message || 'Failed to create event');
         }
     };
 
@@ -302,13 +308,8 @@ const Schedule = () => {
     return (
         <div className="container">
             {error && (
-                <div role="alert" className="alert alert-error">
+                <div role="alert" className="error-message">
                     {error}
-                </div>
-            )}
-            {deleteError && (
-                <div role="alert" className="alert alert-error">
-                    {deleteError}
                 </div>
             )}
             <div className="section">
@@ -319,37 +320,44 @@ const Schedule = () => {
                 <FullCalendar
                     plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                     initialView="timeGridWeek"
+                    selectable={true}
+                    select={handleDateSelect}
+                    events={events}
+                    eventClick={handleEventClick}
                     headerToolbar={{
                         left: 'prev,next today',
                         center: 'title',
                         right: 'dayGridMonth,timeGridWeek,timeGridDay'
                     }}
-                    events={events}
-                    selectable={true}
-                    selectMirror={true}
-                    dayMaxEvents={true}
-                    weekends={true}
-                    select={handleDateSelect}
-                    eventClick={handleEventClick}
-                    timeZone="local"
-                    initialDate={new Date()}
-                    eventDidMount={(info) => {
-                        info.el.setAttribute('data-interactive', info.event.extendedProps.interactive);
+                    slotMinTime="08:00:00"
+                    slotMaxTime="20:00:00"
+                    allDaySlot={false}
+                    selectConstraint={{
+                        startTime: '08:00',
+                        endTime: '20:00',
+                        daysOfWeek: [0, 1, 2, 3, 4, 5, 6]
                     }}
+                    businessHours={{
+                        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+                        startTime: '08:00',
+                        endTime: '20:00'
+                    }}
+                    selectOverlap={false}
+                    loading={loading}
                 />
             </div>
-            {isModalOpen && (
+            {isModalOpen && selectedSlot && (
                 <EventModal
                     isOpen={isModalOpen}
                     onClose={() => {
                         setIsModalOpen(false);
                         setSelectedSlot(null);
-                        setError(null);
+                        setInitialEventData(null);
                     }}
                     onSubmit={handleEventSubmit}
-                    initialData={selectedSlot}
-                    startTime={selectedSlot?.start}
-                    endTime={selectedSlot?.end}
+                    startTime={selectedSlot.start}
+                    endTime={selectedSlot.end}
+                    initialData={initialEventData}
                 />
             )}
             {isDetailsModalOpen && selectedEvent && (
@@ -358,10 +366,12 @@ const Schedule = () => {
                     onClose={() => {
                         setIsDetailsModalOpen(false);
                         setSelectedEvent(null);
-                        setError(null);
                     }}
                     event={selectedEvent}
                     onDelete={handleEventDelete}
+                    deleteError={deleteError}
+                    isAdmin={isAdmin}
+                    isUsersEvent={selectedEvent.user_email === user?.email}
                 />
             )}
         </div>
