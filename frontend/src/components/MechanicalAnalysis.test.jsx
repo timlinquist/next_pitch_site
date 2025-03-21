@@ -4,6 +4,12 @@ import '@testing-library/jest-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import MechanicalAnalysis from './MechanicalAnalysis';
 import config from '../config';
+import { useAuth0 } from '@auth0/auth0-react';
+
+// Mock the Auth0 hook
+vi.mock('@auth0/auth0-react', () => ({
+    useAuth0: vi.fn()
+}));
 
 // Mock the config
 vi.mock('../config', () => ({
@@ -20,6 +26,13 @@ describe('MechanicalAnalysis', () => {
     beforeEach(() => {
         // Clear all mocks before each test
         vi.clearAllMocks();
+
+        // Setup default Auth0 mock
+        useAuth0.mockReturnValue({
+            getAccessTokenSilently: vi.fn().mockResolvedValue('test-token'),
+            isAuthenticated: true,
+            user: { email: 'test@example.com' }
+        });
     });
 
     it('renders the component with upload forms', () => {
@@ -91,10 +104,17 @@ describe('MechanicalAnalysis', () => {
                 `${config.apiBaseUrl}/video/upload`,
                 expect.objectContaining({
                     method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer test-token'
+                    },
                     body: expect.any(FormData)
                 })
             );
         });
+
+        // Verify the FormData contains the file
+        const formData = fetch.mock.calls[0][1].body;
+        expect(formData.get('video')).toEqual(videoFile);
     });
 
     it('handles upload error', async () => {
@@ -118,7 +138,16 @@ describe('MechanicalAnalysis', () => {
             expect(screen.getByText('Upload failed')).toBeInTheDocument();
         });
         
-        // Verify fetch was called
-        expect(fetch).toHaveBeenCalled();
+        // Verify fetch was called with the correct parameters
+        expect(fetch).toHaveBeenCalledWith(
+            `${config.apiBaseUrl}/video/upload`,
+            expect.objectContaining({
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer test-token'
+                },
+                body: expect.any(FormData)
+            })
+        );
     });
 }); 

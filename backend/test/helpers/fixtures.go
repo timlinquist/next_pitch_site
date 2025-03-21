@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	_ "github.com/lib/pq"
 	"nextpitch.com/backend/models"
 )
 
@@ -24,8 +25,7 @@ type TestDB struct {
 	Fixtures *ScheduleFixtures
 }
 
-// LoadFixtures loads test data from JSON files
-func LoadFixtures(t *testing.T) *ScheduleFixtures {
+func LoadFixtures(t interface{ Fatal(args ...interface{}) }) *ScheduleFixtures {
 	// Get the current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -60,8 +60,7 @@ func LoadFixtures(t *testing.T) *ScheduleFixtures {
 	return &fixtures
 }
 
-// runMigrations runs database migrations
-func runMigrations(t *testing.T, dbname string) {
+func runMigrations(t interface{ Fatal(args ...interface{}) }, dbname string) {
 	// Get the current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -93,8 +92,7 @@ func runMigrations(t *testing.T, dbname string) {
 	}
 }
 
-// SetupTestDB creates a test database and loads fixtures
-func SetupTestDB(t *testing.T) *TestDB {
+func SetupTestDB(t interface{ Fatal(args ...interface{}) }) *sql.DB {
 	// Use test database configuration
 	host := "localhost"
 	port := "5432"
@@ -113,27 +111,62 @@ func SetupTestDB(t *testing.T) *TestDB {
 	// Run migrations
 	runMigrations(t, dbname)
 
-	// Load fixtures
-	fixtures := LoadFixtures(t)
-
-	return &TestDB{
-		DB:       testDB,
-		Fixtures: fixtures,
+	// Clean up the test database before each test
+	_, err = testDB.Exec(`
+		TRUNCATE TABLE video_uploads CASCADE;
+		TRUNCATE TABLE schedule_entries CASCADE;
+		TRUNCATE TABLE users CASCADE;
+	`)
+	if err != nil {
+		t.Fatal(fmt.Sprintf("Failed to clean up test database: %v", err))
 	}
+
+	return testDB
+}
+
+func InsertTestData(t interface{ Fatal(args ...interface{}) }, db *sql.DB, entry models.ScheduleEntry) int {
+	// First, create or get the user
+	var userID int
+	err := db.QueryRow(`
+		WITH new_user AS (
+			INSERT INTO users (email, name, is_admin)
+			VALUES ($1, '', false)
+			ON CONFLICT (email) DO NOTHING
+			RETURNING id
+		)
+		SELECT id FROM new_user
+		UNION ALL
+		SELECT id FROM users WHERE email = $1
+		LIMIT 1
+	`, entry.UserEmail).Scan(&userID)
+	if err != nil {
+		t.Fatal(fmt.Sprintf("Failed to create/get user: %v", err))
+	}
+
+	// Then insert the schedule entry
+	var id int
+	err = db.QueryRow(`
+		INSERT INTO schedule_entries (title, description, start_time, end_time, user_id, recurrence)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id
+	`, entry.Title, entry.Description, entry.StartTime, entry.EndTime, userID, entry.Recurrence).Scan(&id)
+	if err != nil {
+		t.Fatal(fmt.Sprintf("Failed to insert test data: %v", err))
+	}
+	return id
 }
 
 // CleanupTestDB cleans up the test database
 func (tdb *TestDB) CleanupTestDB(t *testing.T) {
-	// Clean up the test database
-	_, err := tdb.DB.Exec("TRUNCATE TABLE schedule_entries, users CASCADE")
+	// Clean up the test database in the correct order
+	_, err := tdb.DB.Exec(`
+		TRUNCATE TABLE video_uploads CASCADE;
+		TRUNCATE TABLE schedule_entries CASCADE;
+		TRUNCATE TABLE users CASCADE;
+	`)
 	if err != nil {
 		t.Fatal(fmt.Sprintf("Failed to clean up test database: %v", err))
 	}
-}
-
-// Close closes the database connection
-func (tdb *TestDB) Close() error {
-	return tdb.DB.Close()
 }
 
 // InsertTestData inserts a schedule entry into the test database
@@ -142,8 +175,8 @@ func (tdb *TestDB) InsertTestData(t *testing.T, entry models.ScheduleEntry) int 
 	var userID int
 	err := tdb.DB.QueryRow(`
 		WITH new_user AS (
-			INSERT INTO users (email, first_name, last_name)
-			VALUES ($1, '', '')
+			INSERT INTO users (email, name, is_admin)
+			VALUES ($1, '', false)
 			ON CONFLICT (email) DO NOTHING
 			RETURNING id
 		)
@@ -159,10 +192,10 @@ func (tdb *TestDB) InsertTestData(t *testing.T, entry models.ScheduleEntry) int 
 	// Then insert the schedule entry
 	var id int
 	err = tdb.DB.QueryRow(`
-		INSERT INTO schedule_entries (title, description, start_time, end_time, user_id)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO schedule_entries (title, description, start_time, end_time, user_id, recurrence)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id
-	`, entry.Title, entry.Description, entry.StartTime, entry.EndTime, userID).Scan(&id)
+	`, entry.Title, entry.Description, entry.StartTime, entry.EndTime, userID, entry.Recurrence).Scan(&id)
 	if err != nil {
 		t.Fatal(fmt.Sprintf("Failed to insert test data: %v", err))
 	}

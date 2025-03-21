@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { FaTimes, FaTrash } from 'react-icons/fa';
 
+const formatRecurrence = (recurrence) => {
+    if (!recurrence || recurrence === 'none') return 'One-time event';
+    return recurrence.charAt(0).toUpperCase() + recurrence.slice(1);
+};
+
 const EventDetailsModal = ({ isOpen, onClose, event, onDelete }) => {
     const [showConfirm, setShowConfirm] = useState(false);
 
@@ -41,6 +46,9 @@ const EventDetailsModal = ({ isOpen, onClose, event, onDelete }) => {
                     </p>
                     <p>
                         <strong>End:</strong> {new Date(event.end).toLocaleString()}
+                    </p>
+                    <p>
+                        <strong>Recurrence:</strong> {formatRecurrence(event.recurrence)}
                     </p>
                 </div>
                 <div className="event-description">

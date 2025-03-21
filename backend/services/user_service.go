@@ -19,15 +19,13 @@ func NewUserService(db DB) *UserService {
 func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	err := s.db.QueryRow(`
-		SELECT id, email, first_name, last_name, phone_number, admin, created_at, updated_at
+		SELECT id, email, name, is_admin, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`, email).Scan(
 		&user.ID,
 		&user.Email,
-		&user.FirstName,
-		&user.LastName,
-		&user.PhoneNumber,
+		&user.Name,
 		&user.IsAdmin,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -46,16 +44,13 @@ func (s *UserService) GetUserByEmail(email string) (*models.User, error) {
 func (s *UserService) CreateUser(user *models.User) error {
 	now := time.Now()
 	err := s.db.QueryRow(`
-		INSERT INTO users (email, first_name, last_name, phone_number, admin, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO users (email, name, is_admin, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $4)
 		RETURNING id
 	`,
 		user.Email,
-		user.FirstName,
-		user.LastName,
-		user.PhoneNumber,
+		user.Name,
 		user.IsAdmin,
-		now,
 		now,
 	).Scan(&user.ID)
 
@@ -71,7 +66,7 @@ func (s *UserService) CreateUser(user *models.User) error {
 func (s *UserService) IsAdmin(email string) (bool, error) {
 	var isAdmin bool
 	err := s.db.QueryRow(`
-		SELECT admin
+		SELECT is_admin
 		FROM users
 		WHERE email = $1
 	`, email).Scan(&isAdmin)

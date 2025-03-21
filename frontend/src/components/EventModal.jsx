@@ -2,9 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useLocation } from 'react-router-dom';
 
+const RECURRENCE_OPTIONS = {
+    NONE: 'none',
+    WEEKLY: 'weekly',
+    BIWEEKLY: 'biweekly',
+    MONTHLY: 'monthly'
+};
+
 const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [recurrence, setRecurrence] = useState(RECURRENCE_OPTIONS.NONE);
     const { isAuthenticated, loginWithRedirect, user } = useAuth0();
     const location = useLocation();
 
@@ -14,9 +22,11 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
             if (initialData) {
                 setTitle(initialData.title ?? '');
                 setDescription(initialData.description ?? '');
+                setRecurrence(initialData.recurrence ?? RECURRENCE_OPTIONS.NONE);
             } else {
                 setTitle('');
                 setDescription('');
+                setRecurrence(RECURRENCE_OPTIONS.NONE);
             }
         }
     }, [isOpen, initialData]);
@@ -28,6 +38,7 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
         const formData = {
             title,
             description,
+            recurrence,
             selectedSlot: {
                 start: startTime.toISOString(),
                 end: endTime.toISOString()
@@ -55,10 +66,12 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
             description,
             start_time: startTime,
             end_time: endTime,
-            user_email: user?.email
+            user_email: user?.email,
+            recurrence
         });
         setTitle('');
         setDescription('');
+        setRecurrence(RECURRENCE_OPTIONS.NONE);
         onClose();
     };
 
@@ -85,6 +98,19 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
                             onChange={(e) => setDescription(e.target.value)}
                             required
                         />
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="recurrence">Recurrence:</label>
+                        <select
+                            id="recurrence"
+                            value={recurrence}
+                            onChange={(e) => setRecurrence(e.target.value)}
+                        >
+                            <option value={RECURRENCE_OPTIONS.NONE}>None</option>
+                            <option value={RECURRENCE_OPTIONS.WEEKLY}>Weekly</option>
+                            <option value={RECURRENCE_OPTIONS.BIWEEKLY}>Bi-weekly</option>
+                            <option value={RECURRENCE_OPTIONS.MONTHLY}>Monthly</option>
+                        </select>
                     </div>
                     {!isAuthenticated && (
                         <div className="error">

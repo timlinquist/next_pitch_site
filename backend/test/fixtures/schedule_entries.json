@@ -4,27 +4,31 @@
     "description": "Test Description",
     "start_time": "2024-03-06T10:00:00Z",
     "end_time": "2024-03-06T11:00:00Z",
-    "user_email": "test@example.com"
+    "user_email": "test@example.com",
+    "recurrence": "none"
   },
   "new_event": {
     "title": "New Event",
     "description": "New Description",
     "start_time": "2024-03-06T14:00:00Z",
     "end_time": "2024-03-06T15:00:00Z",
-    "user_email": "test@example.com"
+    "user_email": "test@example.com",
+    "recurrence": "weekly"
   },
   "original_event": {
     "title": "Original Event",
     "description": "Original Description",
     "start_time": "2024-03-06T16:00:00Z",
     "end_time": "2024-03-06T17:00:00Z",
-    "user_email": "test@example.com"
+    "user_email": "test@example.com",
+    "recurrence": "biweekly"
   },
   "event_to_delete": {
     "title": "Event to Delete",
     "description": "Description",
     "start_time": "2024-03-06T18:00:00Z",
     "end_time": "2024-03-06T19:00:00Z",
-    "user_email": "test@example.com"
+    "user_email": "test@example.com",
+    "recurrence": "monthly"
   }
 } 

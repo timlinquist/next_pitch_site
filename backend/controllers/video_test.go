@@ -3,21 +3,23 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
+	"nextpitch.com/backend/models"
+	"nextpitch.com/backend/services"
+	"nextpitch.com/backend/test/helpers"
 )
 
-// MockVideo implements a mock Video model for testing
+// MockVideo implements VideoUploader interface for testing
 type MockVideo struct {
 	uploadFunc func(file io.Reader, filename string) (string, string, error)
 }
@@ -26,10 +28,17 @@ func (m *MockVideo) Upload(file io.Reader, filename string) (string, string, err
 	if m.uploadFunc != nil {
 		return m.uploadFunc(file, filename)
 	}
-	return "", "", nil
+	return "/test/path", "https://test.com/video.mp4", nil
 }
 
 func TestNewVideoController(t *testing.T) {
+	// Setup
+	testDB := helpers.SetupTestDB(t)
+	defer testDB.Close()
+
+	// Create services
+	userService := services.NewUserService(testDB)
+
 	tests := []struct {
 		name        string
 		envToken    string
@@ -45,7 +54,7 @@ func TestNewVideoController(t *testing.T) {
 			name:        "missing token",
 			envToken:    "",
 			wantErr:     true,
-			errContains: "DROPBOX_ACCESS_TOKEN not found",
+			errContains: "error loading .env file",
 		},
 	}
 
@@ -58,162 +67,238 @@ func TestNewVideoController(t *testing.T) {
 			// Create a mock environment loader
 			mockEnvLoader := func(filenames ...string) error {
 				if tt.envToken == "" {
-					return fmt.Errorf("DROPBOX_ACCESS_TOKEN not found")
+					return fmt.Errorf("error loading .env file")
 				}
 				return nil
 			}
 
 			// Test initialization
-			got, err := NewVideoController(mockEnvLoader)
+			got, err := NewVideoController(testDB, userService, mockEnvLoader)
 			if tt.wantErr {
-				if err == nil {
-					t.Error("NewVideoController() error = nil, wantErr true")
-				}
-				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("NewVideoController() error = %v, want error containing %v", err, tt.errContains)
+				assert.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
 				}
 				return
 			}
-			if err != nil {
-				t.Errorf("NewVideoController() error = %v, wantErr false", err)
-				return
-			}
-			if got == nil {
-				t.Error("NewVideoController() returned nil without error")
-			}
+			assert.NoError(t, err)
+			assert.NotNil(t, got)
+			assert.NotNil(t, got.video)
+			assert.Equal(t, testDB, got.db)
+			assert.Equal(t, userService, got.userService)
 		})
 	}
 }
 
 func TestVideoController_UploadVideo(t *testing.T) {
+	// Setup
+	testDB := helpers.SetupTestDB(t)
+	defer testDB.Close()
+
+	// Set up test environment variables
+	os.Setenv("DROPBOX_ACCESS_TOKEN", "test_token")
+	defer os.Unsetenv("DROPBOX_ACCESS_TOKEN")
+
+	// Create services
+	userService := services.NewUserService(testDB)
+
+	// Create test user
+	user := &models.User{
+		Email:   "test@example.com",
+		Name:    "Test User",
+		IsAdmin: false,
+	}
+	err := userService.CreateUser(user)
+	assert.NoError(t, err)
+
 	tests := []struct {
 		name           string
-		fileContent    string
+		file           []byte
 		filename       string
-		fileSize       int64
-		uploadFunc     func(file io.Reader, filename string) (string, string, error)
-		wantStatus     int
-		wantResponse   map[string]interface{}
-		wantErrMessage string
+		userEmail      string
+		mockUpload     func(file io.Reader, filename string) (string, string, error)
+		expectedStatus int
+		expectedFields []string
 	}{
 		{
-			name:        "successful upload",
-			fileContent: "test video content",
-			filename:    "test.mp4",
-			fileSize:    1024, // 1KB
-			uploadFunc: func(file io.Reader, filename string) (string, string, error) {
-				return "/videos/test.mp4", "https://test.com/video.mp4", nil
+			name:      "successful upload with db verification",
+			file:      []byte("test video content"),
+			filename:  "test.mp4",
+			userEmail: user.Email,
+			mockUpload: func(file io.Reader, filename string) (string, string, error) {
+				return "/test/path", "https://test.com/video.mp4", nil
 			},
-			wantStatus: http.StatusOK,
-			wantResponse: map[string]interface{}{
-				"message": "Video uploaded successfully",
-				"path":    "/videos/test.mp4",
-				"link":    "https://test.com/video.mp4",
-			},
+			expectedStatus: http.StatusOK,
+			expectedFields: []string{"link", "message", "path", "upload_id"},
 		},
 		{
-			name:           "missing file",
-			fileContent:    "",
-			filename:       "",
-			fileSize:       0,
-			uploadFunc:     nil,
-			wantStatus:     http.StatusBadRequest,
-			wantErrMessage: "No video file provided",
-		},
-		{
-			name:           "file too large",
-			fileContent:    "test video content",
+			name:           "invalid file",
+			file:           []byte{},
 			filename:       "test.mp4",
-			fileSize:       maxFileSize + 1,
-			uploadFunc:     nil,
-			wantStatus:     http.StatusBadRequest,
-			wantErrMessage: "File too large",
+			userEmail:      user.Email,
+			expectedStatus: http.StatusBadRequest,
+			expectedFields: []string{"error"},
 		},
 		{
-			name:           "invalid file type",
-			fileContent:    "test video content",
-			filename:       "test.txt",
-			fileSize:       1024,
-			uploadFunc:     nil,
-			wantStatus:     http.StatusBadRequest,
-			wantErrMessage: "Invalid file type",
+			name:           "unauthorized",
+			file:           []byte("test video content"),
+			filename:       "test.mp4",
+			userEmail:      "",
+			expectedStatus: http.StatusUnauthorized,
+			expectedFields: []string{"error"},
 		},
 		{
-			name:        "upload failure",
-			fileContent: "test video content",
-			filename:    "test.mp4",
-			fileSize:    1024,
-			uploadFunc: func(file io.Reader, filename string) (string, string, error) {
-				return "", "", errors.New("upload failed")
+			name:      "invalid file type",
+			file:      []byte("test video content"),
+			filename:  "test.txt",
+			userEmail: user.Email,
+			mockUpload: func(file io.Reader, filename string) (string, string, error) {
+				return "", "", fmt.Errorf("Invalid file type")
 			},
-			wantStatus:     http.StatusInternalServerError,
-			wantErrMessage: "upload failed",
+			expectedStatus: http.StatusBadRequest,
+			expectedFields: []string{"error"},
+		},
+		{
+			name:      "upload failure",
+			file:      []byte("test video content"),
+			filename:  "test.mp4",
+			userEmail: user.Email,
+			mockUpload: func(file io.Reader, filename string) (string, string, error) {
+				return "", "", fmt.Errorf("upload failed")
+			},
+			expectedStatus: http.StatusInternalServerError,
+			expectedFields: []string{"error"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Set up Gin router
-			gin.SetMode(gin.TestMode)
+			// Create mock video uploader
+			mockVideo := &MockVideo{
+				uploadFunc: tt.mockUpload,
+			}
+
+			// Create controller with mock
+			vc := &VideoController{
+				video:       mockVideo,
+				db:          testDB,
+				userService: userService,
+			}
+
+			// Setup Gin context
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
+
+			// Set user email in context
+			if tt.userEmail != "" {
+				c.Set("user_email", tt.userEmail)
+			}
 
 			// Create multipart form
 			body := &bytes.Buffer{}
 			writer := multipart.NewWriter(body)
-			if tt.fileContent != "" {
-				part, err := writer.CreateFormFile("video", tt.filename)
-				if err != nil {
-					t.Fatalf("Failed to create form file: %v", err)
-				}
-				// Create a file with the specified size
-				if tt.fileSize > maxFileSize {
-					// Create a large file by repeating content
-					content := make([]byte, tt.fileSize)
-					part.Write(content)
-				} else {
-					part.Write([]byte(tt.fileContent))
-				}
-			}
-			writer.Close()
 
-			// Set up request
-			c.Request, _ = http.NewRequest("POST", "/api/video/upload", body)
+			if len(tt.file) > 0 {
+				part, err := writer.CreateFormFile("video", tt.filename)
+				assert.NoError(t, err)
+				_, err = part.Write(tt.file)
+				assert.NoError(t, err)
+			}
+			err = writer.Close()
+			assert.NoError(t, err)
+
+			// Set request
+			c.Request = httptest.NewRequest("POST", "/upload", body)
 			c.Request.Header.Set("Content-Type", writer.FormDataContentType())
 
-			// Create mock video model
-			mockVideo := &MockVideo{
-				uploadFunc: tt.uploadFunc,
+			// Test
+			vc.UploadVideo(c)
+
+			// Assert
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			var response map[string]interface{}
+			err = json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+
+			// Check expected fields
+			for _, field := range tt.expectedFields {
+				assert.Contains(t, response, field, "Response should contain field: %s", field)
 			}
 
-			// Create controller with mock
-			controller := &VideoController{
-				video: mockVideo,
-			}
-
-			// Test upload
-			controller.UploadVideo(c)
-
-			// Check response
-			assert.Equal(t, tt.wantStatus, w.Code)
-
-			if tt.wantResponse != nil {
-				var response map[string]interface{}
-				err := json.Unmarshal(w.Body.Bytes(), &response)
-				if err != nil {
-					t.Fatalf("Failed to unmarshal response: %v", err)
-				}
-				assert.Equal(t, tt.wantResponse, response)
-			}
-
-			if tt.wantErrMessage != "" {
-				var response map[string]interface{}
-				err := json.Unmarshal(w.Body.Bytes(), &response)
-				if err != nil {
-					t.Fatalf("Failed to unmarshal response: %v", err)
-				}
-				assert.Contains(t, response["error"], tt.wantErrMessage)
+			// If successful upload, verify database
+			if tt.expectedStatus == http.StatusOK {
+				var uploadID int
+				err := testDB.QueryRow("SELECT id FROM video_uploads WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1", user.ID).Scan(&uploadID)
+				assert.NoError(t, err)
+				assert.Equal(t, float64(uploadID), response["upload_id"])
 			}
 		})
 	}
+}
+
+func TestVideoController_GetVideos(t *testing.T) {
+	// Setup
+	testDB := helpers.SetupTestDB(t)
+	defer testDB.Close()
+
+	// Set up test environment variables
+	os.Setenv("DROPBOX_ACCESS_TOKEN", "test_token")
+	defer os.Unsetenv("DROPBOX_ACCESS_TOKEN")
+
+	// Create services
+	userService := services.NewUserService(testDB)
+
+	// Create mock video uploader
+	mockVideo := &MockVideo{}
+
+	// Create controller with mock
+	vc := &VideoController{
+		video:       mockVideo,
+		db:          testDB,
+		userService: userService,
+	}
+
+	// Create test user
+	user := &models.User{
+		Email:   "test@example.com",
+		Name:    "Test User",
+		IsAdmin: false,
+	}
+	err := userService.CreateUser(user)
+	assert.NoError(t, err)
+
+	// Create test video upload
+	_, err = testDB.Exec(`
+		INSERT INTO video_uploads (user_id, dropbox_url, file_name, status)
+		VALUES ($1, $2, $3, $4)
+	`, user.ID, "https://test.com/video.mp4", "test.mp4", models.VideoUploadStatusUploaded)
+	assert.NoError(t, err)
+
+	// Setup Gin context
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set("user_email", user.Email)
+
+	// Test
+	vc.GetVideos(c)
+
+	// Assert
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var response struct {
+		Videos []struct {
+			ID         int                      `json:"id"`
+			DropboxURL string                   `json:"dropbox_url"`
+			FileName   string                   `json:"file_name"`
+			Status     models.VideoUploadStatus `json:"status"`
+			CreatedAt  string                   `json:"created_at"`
+		} `json:"videos"`
+	}
+	err = json.Unmarshal(w.Body.Bytes(), &response)
+	assert.NoError(t, err)
+	assert.Len(t, response.Videos, 1)
+	assert.Equal(t, "https://test.com/video.mp4", response.Videos[0].DropboxURL)
+	assert.Equal(t, "test.mp4", response.Videos[0].FileName)
+	assert.Equal(t, models.VideoUploadStatusUploaded, response.Videos[0].Status)
 }

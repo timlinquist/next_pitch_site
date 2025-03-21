@@ -3,14 +3,17 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
 	"nextpitch.com/backend/models"
+	"nextpitch.com/backend/services"
 	"nextpitch.com/backend/test/helpers"
 )
 
@@ -19,18 +22,38 @@ func TestGetScheduleEntries(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	// Clean up before test
-	testDB.CleanupTestDB(t)
+	// Create services
+	scheduleService := services.NewScheduleService(testDB)
+	userService := services.NewUserService(testDB)
 
-	// Insert test data
-	testDB.InsertTestData(t, testDB.Fixtures.TestEvent)
+	// Create controller with services
+	sc := NewScheduleController(scheduleService, userService)
 
-	// Create controller with test DB
-	sc := &ScheduleController{db: testDB.DB}
+	// Create test user
+	user := &models.User{
+		Email:   "test@example.com",
+		Name:    "Test User",
+		IsAdmin: false,
+	}
+	err := userService.CreateUser(user)
+	assert.NoError(t, err)
 
-	// Setup Gin router
+	// Create test entry
+	entry := &models.ScheduleEntry{
+		Title:       "Test Event",
+		Description: "Test Description",
+		StartTime:   time.Now().Add(24 * time.Hour),
+		EndTime:     time.Now().Add(25 * time.Hour),
+		UserEmail:   user.Email,
+		Recurrence:  models.RecurrenceNone,
+	}
+	err = scheduleService.CreateScheduleEntry(entry, user.Email, user.IsAdmin)
+	assert.NoError(t, err)
+
+	// Setup Gin context
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_email", user.Email)
 
 	// Test
 	sc.GetScheduleEntries(c)
@@ -39,10 +62,12 @@ func TestGetScheduleEntries(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var entries []models.ScheduleEntry
-	err := json.Unmarshal(w.Body.Bytes(), &entries)
+	err = json.Unmarshal(w.Body.Bytes(), &entries)
 	assert.NoError(t, err)
+	assert.NotNil(t, entries)
 	assert.Len(t, entries, 1)
-	assert.Equal(t, testDB.Fixtures.TestEvent.Title, entries[0].Title)
+	assert.Equal(t, entry.Title, entries[0].Title)
+	assert.Equal(t, entry.Description, entries[0].Description)
 }
 
 func TestCreateScheduleEntry(t *testing.T) {
@@ -50,33 +75,119 @@ func TestCreateScheduleEntry(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	// Clean up before test
-	testDB.CleanupTestDB(t)
+	// Create services
+	scheduleService := services.NewScheduleService(testDB)
+	userService := services.NewUserService(testDB)
 
-	sc := &ScheduleController{db: testDB.DB}
+	// Create controller with services
+	sc := NewScheduleController(scheduleService, userService)
 
-	// Convert entry to JSON
-	jsonData, err := json.Marshal(testDB.Fixtures.NewEvent)
-	assert.NoError(t, err)
+	tests := []struct {
+		name          string
+		entry         *models.ScheduleEntry
+		user          *models.User
+		expectedCode  int
+		expectedError string
+	}{
+		{
+			name: "successful creation by admin",
+			entry: &models.ScheduleEntry{
+				Title:       "Test Event",
+				Description: "Test Description",
+				StartTime:   time.Now().Add(24 * time.Hour),
+				EndTime:     time.Now().Add(48 * time.Hour),
+				UserEmail:   "admin@example.com",
+				Recurrence:  models.RecurrenceNone,
+			},
+			user: &models.User{
+				Email:   "admin@example.com",
+				Name:    "Test User",
+				IsAdmin: true,
+			},
+			expectedCode:  http.StatusCreated,
+			expectedError: "",
+		},
+		{
+			name: "non-admin cannot create long event",
+			entry: &models.ScheduleEntry{
+				Title:       "Long Event",
+				Description: "Test Description",
+				StartTime:   time.Now().Add(72 * time.Hour),
+				EndTime:     time.Now().Add(96 * time.Hour),
+				UserEmail:   "user@example.com",
+				Recurrence:  models.RecurrenceNone,
+			},
+			user: &models.User{
+				Email:   "user@example.com",
+				Name:    "Test User",
+				IsAdmin: false,
+			},
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "event duration exceeds maximum allowed duration for non-admin users",
+		},
+		{
+			name: "non-admin can create short event",
+			entry: &models.ScheduleEntry{
+				Title:       "Short Event",
+				Description: "Test Description",
+				StartTime:   time.Now().Add(120 * time.Hour),
+				EndTime:     time.Now().Add(121 * time.Hour),
+				UserEmail:   "user2@example.com",
+				Recurrence:  models.RecurrenceWeekly,
+			},
+			user: &models.User{
+				Email:   "user2@example.com",
+				Name:    "Test User",
+				IsAdmin: false,
+			},
+			expectedCode:  http.StatusCreated,
+			expectedError: "",
+		},
+	}
 
-	// Setup Gin router
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest("POST", "/api/schedule", bytes.NewBuffer(jsonData))
-	c.Request.Header.Set("Content-Type", "application/json")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test user
+			err := userService.CreateUser(tt.user)
+			if err != nil {
+				t.Fatalf("Failed to create test user: %v", err)
+			}
 
-	// Test
-	sc.CreateScheduleEntry(c)
+			// Setup Gin context
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Set("user_email", tt.user.Email)
 
-	// Assert
-	assert.Equal(t, http.StatusCreated, w.Code)
+			// Set request body
+			body, err := json.Marshal(tt.entry)
+			if err != nil {
+				t.Fatalf("Failed to marshal request body: %v", err)
+			}
+			c.Request = httptest.NewRequest("POST", "/schedule", bytes.NewBuffer(body))
+			c.Request.Header.Set("Content-Type", "application/json")
 
-	var response models.ScheduleEntry
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, testDB.Fixtures.NewEvent.Title, response.Title)
-	assert.Equal(t, testDB.Fixtures.NewEvent.Description, response.Description)
-	assert.NotZero(t, response.ID)
+			// Test
+			sc.CreateScheduleEntry(c)
+
+			// Assert
+			assert.Equal(t, tt.expectedCode, w.Code)
+
+			if tt.expectedError != "" {
+				var response map[string]string
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Contains(t, response["error"], tt.expectedError)
+				return
+			}
+
+			var response models.ScheduleEntry
+			err = json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.entry.Title, response.Title)
+			assert.Equal(t, tt.entry.Description, response.Description)
+			assert.NotZero(t, response.ID)
+		})
+	}
 }
 
 func TestUpdateScheduleEntry(t *testing.T) {
@@ -84,42 +195,125 @@ func TestUpdateScheduleEntry(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	// Clean up before test
-	testDB.CleanupTestDB(t)
+	// Create services
+	scheduleService := services.NewScheduleService(testDB)
+	userService := services.NewUserService(testDB)
 
-	// Insert test data
-	id := testDB.InsertTestData(t, testDB.Fixtures.OriginalEvent)
+	// Create controller with services
+	sc := NewScheduleController(scheduleService, userService)
 
-	sc := &ScheduleController{db: testDB.DB}
+	tests := []struct {
+		name          string
+		initialEntry  *models.ScheduleEntry
+		updatedEntry  *models.ScheduleEntry
+		user          *models.User
+		expectedCode  int
+		expectedError string
+	}{
+		{
+			name: "successful update by admin",
+			initialEntry: &models.ScheduleEntry{
+				Title:       "Initial Event",
+				Description: "Initial Description",
+				StartTime:   time.Now().Add(24 * time.Hour),
+				EndTime:     time.Now().Add(25 * time.Hour),
+				Recurrence:  models.RecurrenceNone,
+			},
+			updatedEntry: &models.ScheduleEntry{
+				Title:       "Updated Event",
+				Description: "Updated Description",
+				StartTime:   time.Now().Add(48 * time.Hour),
+				EndTime:     time.Now().Add(72 * time.Hour),
+				Recurrence:  models.RecurrenceMonthly,
+			},
+			user: &models.User{
+				Email:   "admin@example.com",
+				Name:    "Test User",
+				IsAdmin: true,
+			},
+			expectedCode:  http.StatusOK,
+			expectedError: "",
+		},
+		{
+			name: "non-admin cannot update to long event",
+			initialEntry: &models.ScheduleEntry{
+				Title:       "Initial Event",
+				Description: "Initial Description",
+				StartTime:   time.Now().Add(96 * time.Hour),
+				EndTime:     time.Now().Add(97 * time.Hour),
+				Recurrence:  models.RecurrenceNone,
+			},
+			updatedEntry: &models.ScheduleEntry{
+				Title:       "Updated Event",
+				Description: "Updated Description",
+				StartTime:   time.Now().Add(120 * time.Hour),
+				EndTime:     time.Now().Add(144 * time.Hour),
+				Recurrence:  models.RecurrenceNone,
+			},
+			user: &models.User{
+				Email:   "user@example.com",
+				Name:    "Test User",
+				IsAdmin: false,
+			},
+			expectedCode:  http.StatusBadRequest,
+			expectedError: "event duration exceeds maximum allowed duration for non-admin users",
+		},
+	}
 
-	// Create update data
-	updatedEvent := testDB.Fixtures.OriginalEvent
-	updatedEvent.ID = id
-	updatedEvent.Title = "Updated Event"
-	updatedEvent.Description = "Updated Description"
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test user
+			err := userService.CreateUser(tt.user)
+			if err != nil {
+				t.Fatalf("Failed to create test user: %v", err)
+			}
 
-	// Convert entry to JSON
-	jsonData, err := json.Marshal(updatedEvent)
-	assert.NoError(t, err)
+			// Create initial entry
+			tt.initialEntry.UserEmail = tt.user.Email
+			err = scheduleService.CreateScheduleEntry(tt.initialEntry, tt.user.Email, tt.user.IsAdmin)
+			if err != nil {
+				t.Fatalf("Failed to create initial entry: %v", err)
+			}
 
-	// Setup Gin router
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Params = []gin.Param{{Key: "id", Value: fmt.Sprintf("%d", id)}}
-	c.Request = httptest.NewRequest("PUT", fmt.Sprintf("/api/schedule/%d", id), bytes.NewBuffer(jsonData))
-	c.Request.Header.Set("Content-Type", "application/json")
+			// Setup update request
+			tt.updatedEntry.ID = tt.initialEntry.ID
+			tt.updatedEntry.UserEmail = tt.user.Email
 
-	// Test
-	sc.UpdateScheduleEntry(c)
+			// Setup Gin context
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Set("user_email", tt.user.Email)
+			c.Params = []gin.Param{{Key: "id", Value: strconv.Itoa(tt.initialEntry.ID)}}
 
-	// Assert
-	assert.Equal(t, http.StatusOK, w.Code)
+			// Set request body
+			body, err := json.Marshal(tt.updatedEntry)
+			if err != nil {
+				t.Fatalf("Failed to marshal request body: %v", err)
+			}
+			c.Request = httptest.NewRequest("PUT", "/schedule/"+strconv.Itoa(tt.initialEntry.ID), bytes.NewBuffer(body))
+			c.Request.Header.Set("Content-Type", "application/json")
 
-	var response models.ScheduleEntry
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Equal(t, updatedEvent.Title, response.Title)
-	assert.Equal(t, updatedEvent.Description, response.Description)
+			// Test
+			sc.UpdateScheduleEntry(c)
+
+			// Assert
+			assert.Equal(t, tt.expectedCode, w.Code)
+
+			if tt.expectedError != "" {
+				var response map[string]string
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				assert.NoError(t, err)
+				assert.Contains(t, response["error"], tt.expectedError)
+				return
+			}
+
+			var response models.ScheduleEntry
+			err = json.Unmarshal(w.Body.Bytes(), &response)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.updatedEntry.Title, response.Title)
+			assert.Equal(t, tt.updatedEntry.Description, response.Description)
+		})
+	}
 }
 
 func TestDeleteScheduleEntry(t *testing.T) {
@@ -127,18 +321,39 @@ func TestDeleteScheduleEntry(t *testing.T) {
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
 
-	// Clean up before test
-	testDB.CleanupTestDB(t)
+	// Create services
+	scheduleService := services.NewScheduleService(testDB)
+	userService := services.NewUserService(testDB)
 
-	// Insert test data
-	id := testDB.InsertTestData(t, testDB.Fixtures.EventToDelete)
+	// Create controller with services
+	sc := NewScheduleController(scheduleService, userService)
 
-	sc := &ScheduleController{db: testDB.DB}
+	// Create test user
+	user := &models.User{
+		Email:   "test@example.com",
+		Name:    "Test User",
+		IsAdmin: false,
+	}
+	err := userService.CreateUser(user)
+	assert.NoError(t, err)
 
-	// Setup Gin router
+	// Create test entry
+	entry := &models.ScheduleEntry{
+		Title:       "Test Event",
+		Description: "Test Description",
+		StartTime:   time.Now().Add(24 * time.Hour),
+		EndTime:     time.Now().Add(25 * time.Hour),
+		UserEmail:   user.Email,
+		Recurrence:  models.RecurrenceNone,
+	}
+	err = scheduleService.CreateScheduleEntry(entry, user.Email, user.IsAdmin)
+	assert.NoError(t, err)
+
+	// Setup Gin context
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	c.Params = []gin.Param{{Key: "id", Value: fmt.Sprintf("%d", id)}}
+	c.Params = []gin.Param{{Key: "id", Value: strconv.Itoa(entry.ID)}}
+	c.Set("user_email", user.Email)
 
 	// Test
 	sc.DeleteScheduleEntry(c)
@@ -148,7 +363,7 @@ func TestDeleteScheduleEntry(t *testing.T) {
 
 	// Verify deletion
 	var count int
-	err := testDB.DB.QueryRow("SELECT COUNT(*) FROM schedule_entries").Scan(&count)
+	err = testDB.QueryRow("SELECT COUNT(*) FROM schedule_entries").Scan(&count)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, count)
 }

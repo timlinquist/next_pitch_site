@@ -30,15 +30,24 @@ describe('AccountPage Component', () => {
             ok: true,
             json: () => Promise.resolve([]),
         });
+
+        // Setup default Auth0 mock
+        useAuth0.mockReturnValue({
+            isAuthenticated: true,
+            user: { email: 'test@example.com', name: 'Test User' },
+            loginWithRedirect: vi.fn(),
+            logout: vi.fn(),
+            getAccessTokenSilently: vi.fn().mockResolvedValue('test-token'),
+        });
     });
 
     it('shows login button when not authenticated', () => {
-        // Override the auth0 mock for this test
-        vi.mocked(useAuth0).mockReturnValue({
+        useAuth0.mockReturnValue({
             isAuthenticated: false,
             user: null,
             loginWithRedirect: vi.fn(),
             logout: vi.fn(),
+            getAccessTokenSilently: vi.fn().mockResolvedValue('test-token'),
         });
 
         renderWithProviders(<AccountPage />);
@@ -47,14 +56,6 @@ describe('AccountPage Component', () => {
     });
 
     it('shows user information when authenticated', async () => {
-        // Set up authenticated state
-        vi.mocked(useAuth0).mockReturnValue({
-            isAuthenticated: true,
-            user: { email: 'test@example.com', name: 'Test User' },
-            loginWithRedirect: vi.fn(),
-            logout: vi.fn(),
-        });
-
         renderWithProviders(<AccountPage />);
         
         // Wait for loading to finish
@@ -66,28 +67,17 @@ describe('AccountPage Component', () => {
         expect(screen.getByText('test@example.com')).toBeInTheDocument();
     });
 
-    it('shows loading state initially', () => {
-        // Set up authenticated state
-        vi.mocked(useAuth0).mockReturnValue({
-            isAuthenticated: true,
-            user: { email: 'test@example.com', name: 'Test User' },
-            loginWithRedirect: vi.fn(),
-            logout: vi.fn(),
-        });
+    it('shows loading state initially', async () => {
+        // Mock a delayed fetch to ensure loading state is visible
+        global.fetch.mockImplementationOnce(() => new Promise(resolve => setTimeout(resolve, 100)));
 
         renderWithProviders(<AccountPage />);
+        
+        // Check for loading state
         expect(screen.getByText('Loading appointments...')).toBeInTheDocument();
     });
 
     it('handles null appointments data gracefully', async () => {
-        // Set up authenticated state
-        vi.mocked(useAuth0).mockReturnValue({
-            isAuthenticated: true,
-            user: { email: 'test@example.com', name: 'Test User' },
-            loginWithRedirect: vi.fn(),
-            logout: vi.fn(),
-        });
-
         // Mock fetch to return null
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -102,18 +92,12 @@ describe('AccountPage Component', () => {
         });
 
         // Should show "No upcoming appointments" message
-        expect(screen.getByText('No upcoming appointments')).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByText(/no upcoming appointments/i)).toBeInTheDocument();
+        });
     });
 
     it('handles empty appointments array', async () => {
-        // Set up authenticated state
-        vi.mocked(useAuth0).mockReturnValue({
-            isAuthenticated: true,
-            user: { email: 'test@example.com', name: 'Test User' },
-            loginWithRedirect: vi.fn(),
-            logout: vi.fn(),
-        });
-
         // Mock fetch to return empty array
         global.fetch.mockResolvedValueOnce({
             ok: true,
@@ -128,18 +112,12 @@ describe('AccountPage Component', () => {
         });
 
         // Should show "No upcoming appointments" message
-        expect(screen.getByText('No upcoming appointments')).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByText(/no upcoming appointments/i)).toBeInTheDocument();
+        });
     });
 
     it('displays appointments when data is available', async () => {
-        // Set up authenticated state
-        vi.mocked(useAuth0).mockReturnValue({
-            isAuthenticated: true,
-            user: { email: 'test@example.com', name: 'Test User' },
-            loginWithRedirect: vi.fn(),
-            logout: vi.fn(),
-        });
-
         const mockAppointments = [
             {
                 id: 1,
@@ -164,19 +142,13 @@ describe('AccountPage Component', () => {
         });
 
         // Should show appointment details
-        expect(screen.getByText('Test Appointment')).toBeInTheDocument();
-        expect(screen.getByText('Test Description')).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByText(/test appointment/i)).toBeInTheDocument();
+            expect(screen.getByText(/test description/i)).toBeInTheDocument();
+        });
     });
 
     it('handles fetch error gracefully', async () => {
-        // Set up authenticated state
-        vi.mocked(useAuth0).mockReturnValue({
-            isAuthenticated: true,
-            user: { email: 'test@example.com', name: 'Test User' },
-            loginWithRedirect: vi.fn(),
-            logout: vi.fn(),
-        });
-
         // Mock fetch to return error
         global.fetch.mockResolvedValueOnce({
             ok: false,

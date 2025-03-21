@@ -24,7 +24,8 @@ func NewScheduleService(db DB) *ScheduleService {
 
 func (s *ScheduleService) GetScheduleEntries() ([]models.ScheduleEntry, error) {
 	rows, err := s.db.Query(`
-		SELECT se.id, se.title, se.start_time, se.end_time, se.description, u.email as user_email
+		SELECT se.id, se.title, se.start_time, se.end_time, se.description, u.email as user_email,
+		       se.created_at, se.updated_at, se.recurrence
 		FROM schedule_entries se
 		JOIN users u ON se.user_id = u.id
 		ORDER BY se.start_time ASC
@@ -37,7 +38,17 @@ func (s *ScheduleService) GetScheduleEntries() ([]models.ScheduleEntry, error) {
 	var entries []models.ScheduleEntry
 	for rows.Next() {
 		var entry models.ScheduleEntry
-		err := rows.Scan(&entry.ID, &entry.Title, &entry.StartTime, &entry.EndTime, &entry.Description, &entry.UserEmail)
+		err := rows.Scan(
+			&entry.ID,
+			&entry.Title,
+			&entry.StartTime,
+			&entry.EndTime,
+			&entry.Description,
+			&entry.UserEmail,
+			&entry.CreatedAt,
+			&entry.UpdatedAt,
+			&entry.Recurrence,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -47,12 +58,50 @@ func (s *ScheduleService) GetScheduleEntries() ([]models.ScheduleEntry, error) {
 	return entries, nil
 }
 
+func (s *ScheduleService) getUserIDOrCreate(email string) (int, error) {
+	// First try to get the existing user
+	var userID int
+	err := s.db.QueryRow(`
+		SELECT id FROM users WHERE email = $1
+	`, email).Scan(&userID)
+
+	if err == nil {
+		// User found, return the ID
+		return userID, nil
+	}
+
+	if err != sql.ErrNoRows {
+		// Unexpected error
+		return 0, err
+	}
+
+	// User not found, create a new one with default values
+	now := time.Now()
+	err = s.db.QueryRow(`
+		INSERT INTO users (
+			email, 
+			name,
+			is_admin, 
+			created_at, 
+			updated_at
+		)
+		VALUES ($1, '', false, $2, $2)
+		RETURNING id
+	`, email, now).Scan(&userID)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return userID, nil
+}
+
 func (s *ScheduleService) CreateScheduleEntry(entry *models.ScheduleEntry, userEmail string, isAdmin bool) error {
 	// Validate event duration for non-admin users
 	if !isAdmin {
 		duration := entry.EndTime.Sub(entry.StartTime)
 		if duration > 2*time.Hour {
-			return errors.New("non-admin users cannot create events longer than 2 hours")
+			return errors.New("event duration exceeds maximum allowed duration for non-admin users")
 		}
 	}
 
@@ -65,19 +114,18 @@ func (s *ScheduleService) CreateScheduleEntry(entry *models.ScheduleEntry, userE
 		return errors.New("event overlaps with existing events")
 	}
 
-	// Get user ID from email
-	var userID int
-	err = s.db.QueryRow("SELECT id FROM users WHERE email = $1", userEmail).Scan(&userID)
+	// Get or create user ID from email
+	userID, err := s.getUserIDOrCreate(userEmail)
 	if err != nil {
-		return errors.New("user not found")
+		return errors.New("failed to process user")
 	}
 
 	now := time.Now()
 	err = s.db.QueryRow(`
-		INSERT INTO schedule_entries (title, start_time, end_time, description, user_id, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO schedule_entries (title, start_time, end_time, description, user_id, created_at, updated_at, recurrence)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
-	`, entry.Title, entry.StartTime, entry.EndTime, entry.Description, userID, now, now).Scan(&entry.ID)
+	`, entry.Title, entry.StartTime, entry.EndTime, entry.Description, userID, now, now, entry.Recurrence).Scan(&entry.ID)
 
 	if err != nil {
 		return err
@@ -94,9 +142,9 @@ func (s *ScheduleService) checkOverlappingEvents(startTime, endTime time.Time) (
 	err := s.db.QueryRow(`
 		SELECT COUNT(*)
 		FROM schedule_entries
-		WHERE (start_time <= $1 AND end_time > $1) OR
-			  (start_time < $2 AND end_time >= $2) OR
-			  (start_time >= $1 AND end_time <= $2)
+		WHERE (start_time < $2 AND end_time > $1) OR  -- Event spans over our new event
+			  (start_time >= $1 AND start_time < $2) OR  -- Event starts during our new event
+			  (end_time > $1 AND end_time <= $2)  -- Event ends during our new event
 	`, startTime, endTime).Scan(&count)
 
 	if err != nil {
@@ -111,7 +159,7 @@ func (s *ScheduleService) UpdateScheduleEntry(entry *models.ScheduleEntry, userE
 	if !isAdmin {
 		duration := entry.EndTime.Sub(entry.StartTime)
 		if duration > 2*time.Hour {
-			return errors.New("non-admin users cannot create events longer than 2 hours")
+			return errors.New("event duration exceeds maximum allowed duration for non-admin users")
 		}
 	}
 
@@ -124,20 +172,19 @@ func (s *ScheduleService) UpdateScheduleEntry(entry *models.ScheduleEntry, userE
 		return errors.New("event overlaps with existing events")
 	}
 
-	// Get user ID from email
-	var userID int
-	err = s.db.QueryRow("SELECT id FROM users WHERE email = $1", userEmail).Scan(&userID)
+	// Get or create user ID from email
+	userID, err := s.getUserIDOrCreate(userEmail)
 	if err != nil {
-		return errors.New("user not found")
+		return errors.New("failed to process user")
 	}
 
 	now := time.Now()
 	err = s.db.QueryRow(`
 		UPDATE schedule_entries
-		SET title = $1, start_time = $2, end_time = $3, description = $4, updated_at = $5
-		WHERE id = $6 AND user_id = $7
+		SET title = $1, start_time = $2, end_time = $3, description = $4, updated_at = $5, recurrence = $6
+		WHERE id = $7 AND user_id = $8
 		RETURNING id
-	`, entry.Title, entry.StartTime, entry.EndTime, entry.Description, now, entry.ID, userID).Scan(&entry.ID)
+	`, entry.Title, entry.StartTime, entry.EndTime, entry.Description, now, entry.Recurrence, entry.ID, userID).Scan(&entry.ID)
 
 	if err == sql.ErrNoRows {
 		return errors.New("schedule entry not found or unauthorized")
@@ -156,10 +203,10 @@ func (s *ScheduleService) checkOverlappingEventsForUpdate(entryID int, startTime
 		SELECT COUNT(*)
 		FROM schedule_entries
 		WHERE id != $1 AND
-			  ((start_time <= $2 AND end_time > $2) OR
-			   (start_time < $3 AND end_time >= $3) OR
-			   (start_time >= $2 AND end_time <= $3))
-	`, entryID, endTime, startTime).Scan(&count)
+			  ((start_time < $3 AND end_time > $2) OR  -- Event spans over our updated event
+			   (start_time >= $2 AND start_time < $3) OR  -- Event starts during our updated event
+			   (end_time > $2 AND end_time <= $3))  -- Event ends during our updated event
+	`, entryID, startTime, endTime).Scan(&count)
 
 	if err != nil {
 		return false, err
@@ -169,11 +216,10 @@ func (s *ScheduleService) checkOverlappingEventsForUpdate(entryID int, startTime
 }
 
 func (s *ScheduleService) DeleteScheduleEntry(id int64, userEmail string) error {
-	// Get user ID from email
-	var userID int
-	err := s.db.QueryRow("SELECT id FROM users WHERE email = $1", userEmail).Scan(&userID)
+	// Get or create user ID from email
+	userID, err := s.getUserIDOrCreate(userEmail)
 	if err != nil {
-		return errors.New("user not found")
+		return errors.New("failed to process user")
 	}
 
 	result, err := s.db.Exec(`
@@ -200,7 +246,8 @@ func (s *ScheduleService) DeleteScheduleEntry(id int64, userEmail string) error 
 func (s *ScheduleService) GetScheduleEntry(id int64) (*models.ScheduleEntry, error) {
 	var entry models.ScheduleEntry
 	err := s.db.QueryRow(`
-		SELECT se.id, se.title, se.start_time, se.end_time, se.description, u.email as user_email, se.created_at, se.updated_at
+		SELECT se.id, se.title, se.start_time, se.end_time, se.description, u.email as user_email,
+		       se.created_at, se.updated_at, se.recurrence
 		FROM schedule_entries se
 		JOIN users u ON se.user_id = u.id
 		WHERE se.id = $1
@@ -213,6 +260,7 @@ func (s *ScheduleService) GetScheduleEntry(id int64) (*models.ScheduleEntry, err
 		&entry.UserEmail,
 		&entry.CreatedAt,
 		&entry.UpdatedAt,
+		&entry.Recurrence,
 	)
 
 	if err == sql.ErrNoRows {
@@ -227,7 +275,8 @@ func (s *ScheduleService) GetScheduleEntry(id int64) (*models.ScheduleEntry, err
 
 func (s *ScheduleService) GetUpcomingAppointmentsByEmail(email string) ([]models.ScheduleEntry, error) {
 	rows, err := s.db.Query(`
-		SELECT se.id, se.title, se.description, se.start_time, se.end_time, u.email as user_email, se.created_at, se.updated_at
+		SELECT se.id, se.title, se.description, se.start_time, se.end_time, u.email as user_email,
+		       se.created_at, se.updated_at, se.recurrence
 		FROM schedule_entries se
 		JOIN users u ON se.user_id = u.id
 		WHERE u.email = $1 AND se.start_time >= NOW()
@@ -250,6 +299,7 @@ func (s *ScheduleService) GetUpcomingAppointmentsByEmail(email string) ([]models
 			&entry.UserEmail,
 			&entry.CreatedAt,
 			&entry.UpdatedAt,
+			&entry.Recurrence,
 		)
 		if err != nil {
 			return nil, err
