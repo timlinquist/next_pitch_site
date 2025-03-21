@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 
@@ -22,16 +23,17 @@ type VideoUploader interface {
 
 // VideoController handles video-related HTTP requests
 type VideoController struct {
-	video       VideoUploader
-	db          *sql.DB
-	userService *services.UserService
+	video        VideoUploader
+	db           *sql.DB
+	userService  *services.UserService
+	emailService *services.EmailService
 }
 
 // EnvLoader is a function type for loading environment variables
 type EnvLoader func(filenames ...string) error
 
 // NewVideoController creates a new video controller
-func NewVideoController(db *sql.DB, userService *services.UserService, envLoader ...EnvLoader) (*VideoController, error) {
+func NewVideoController(db *sql.DB, userService *services.UserService, emailService *services.EmailService, envLoader ...EnvLoader) (*VideoController, error) {
 	// Load environment variables
 	loader := godotenv.Load
 	if len(envLoader) > 0 {
@@ -48,9 +50,10 @@ func NewVideoController(db *sql.DB, userService *services.UserService, envLoader
 	}
 
 	return &VideoController{
-		video:       video,
-		db:          db,
-		userService: userService,
+		video:        video,
+		db:           db,
+		userService:  userService,
+		emailService: emailService,
 	}, nil
 }
 
@@ -115,6 +118,12 @@ func (c *VideoController) UploadVideo(ctx *gin.Context) {
 	if err := models.CreateVideoUpload(c.db, upload); err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload record"})
 		return
+	}
+
+	// Send email notification
+	if err := c.emailService.SendVideoUploadNotification(user, file.Filename); err != nil {
+		log.Printf("[Video] Failed to send upload notification: %v", err)
+		// Don't fail the request if email fails
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{

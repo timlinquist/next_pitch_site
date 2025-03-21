@@ -9,6 +9,7 @@ import (
 	"net/smtp"
 	"os"
 	"path/filepath"
+	"time"
 
 	"nextpitch.com/backend/models"
 )
@@ -26,6 +27,7 @@ func (e EmailType) String() string {
 		"EmailTypeAdminCancellation",
 		"EmailTypeAdminConfirmation",
 		"EmailTypeContact",
+		"EmailTypeVideoUpload",
 	}[e]
 }
 
@@ -35,6 +37,7 @@ const (
 	EmailTypeAdminCancellation
 	EmailTypeAdminConfirmation
 	EmailTypeContact
+	EmailTypeVideoUpload
 )
 
 type EmailData struct {
@@ -43,6 +46,12 @@ type EmailData struct {
 	To       string
 	Subject  string
 	Template string
+}
+
+type VideoUploadData struct {
+	User       *models.User
+	FileName   string
+	UploadTime time.Time
 }
 
 type EmailService struct {
@@ -77,6 +86,7 @@ func NewEmailService() *EmailService {
 		"admin_cancellation": "admin_cancellation.html",
 		"admin_confirmation": "admin_confirmation.html",
 		"contact":            "contact.html",
+		"video_upload":       "video_upload.html",
 	}
 
 	// Set template directory path
@@ -227,6 +237,27 @@ func (s *EmailService) SendAppointmentConfirmationEmail(entry *models.ScheduleEn
 	})
 
 	log.Printf("[Email] Successfully queued confirmation emails for appointment %d", entry.ID)
+	return nil
+}
+
+func (s *EmailService) SendVideoUploadNotification(user *models.User, fileName string) error {
+	log.Printf("[Email] Preparing to send video upload notification for user %s", user.Email)
+
+	data := VideoUploadData{
+		User:       user,
+		FileName:   fileName,
+		UploadTime: time.Now(),
+	}
+
+	s.QueueEmail(EmailData{
+		Type:     EmailTypeVideoUpload,
+		Data:     data,
+		To:       AdminEmail,
+		Subject:  fmt.Sprintf("New Video Upload from %s", user.Name),
+		Template: "video_upload",
+	})
+
+	log.Printf("[Email] Successfully queued video upload notification for user %s", user.Email)
 	return nil
 }
 
