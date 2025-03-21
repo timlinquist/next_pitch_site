@@ -22,10 +22,11 @@ const Auth0ProviderWithNavigate = ({ children }) => {
       clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
       authorizationParams={{
         redirect_uri: window.location.origin,
-        scope: 'openid profile email',
+        scope: 'openid profile email offline_access',
         audience: 'https://thenextpitch.org'
       }}
       useRefreshTokens={true}
+      useRefreshTokensFallback={true}
       cacheLocation="localstorage"
       onRedirectCallback={onRedirectCallback}
     >
