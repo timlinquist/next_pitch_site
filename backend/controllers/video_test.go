@@ -38,6 +38,7 @@ func TestNewVideoController(t *testing.T) {
 
 	// Create services
 	userService := services.NewUserService(testDB)
+	emailService := services.NewEmailService()
 
 	tests := []struct {
 		name        string
@@ -73,7 +74,7 @@ func TestNewVideoController(t *testing.T) {
 			}
 
 			// Test initialization
-			got, err := NewVideoController(testDB, userService, mockEnvLoader)
+			got, err := NewVideoController(testDB, userService, emailService, mockEnvLoader)
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errContains != "" {
@@ -86,6 +87,7 @@ func TestNewVideoController(t *testing.T) {
 			assert.NotNil(t, got.video)
 			assert.Equal(t, testDB, got.db)
 			assert.Equal(t, userService, got.userService)
+			assert.Equal(t, emailService, got.emailService)
 		})
 	}
 }
@@ -101,6 +103,7 @@ func TestVideoController_UploadVideo(t *testing.T) {
 
 	// Create services
 	userService := services.NewUserService(testDB)
+	emailService := services.NewEmailService()
 
 	// Create test user
 	user := &models.User{
@@ -180,9 +183,10 @@ func TestVideoController_UploadVideo(t *testing.T) {
 
 			// Create controller with mock
 			vc := &VideoController{
-				video:       mockVideo,
-				db:          testDB,
-				userService: userService,
+				video:        mockVideo,
+				db:           testDB,
+				userService:  userService,
+				emailService: emailService,
 			}
 
 			// Setup Gin context
@@ -248,16 +252,7 @@ func TestVideoController_GetVideos(t *testing.T) {
 
 	// Create services
 	userService := services.NewUserService(testDB)
-
-	// Create mock video uploader
-	mockVideo := &MockVideo{}
-
-	// Create controller with mock
-	vc := &VideoController{
-		video:       mockVideo,
-		db:          testDB,
-		userService: userService,
-	}
+	emailService := services.NewEmailService()
 
 	// Create test user
 	user := &models.User{
@@ -268,37 +263,79 @@ func TestVideoController_GetVideos(t *testing.T) {
 	err := userService.CreateUser(user)
 	assert.NoError(t, err)
 
-	// Create test video upload
+	// Create test video uploads
 	_, err = testDB.Exec(`
-		INSERT INTO video_uploads (user_id, dropbox_url, file_name, status)
-		VALUES ($1, $2, $3, $4)
-	`, user.ID, "https://test.com/video.mp4", "test.mp4", models.VideoUploadStatusUploaded)
+		INSERT INTO video_uploads (user_id, dropbox_url, file_name, status, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+	`, user.ID, "https://test.com/video1.mp4", "test1.mp4", models.VideoUploadStatusUploaded)
 	assert.NoError(t, err)
 
-	// Setup Gin context
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Set("user_email", user.Email)
+	_, err = testDB.Exec(`
+		INSERT INTO video_uploads (user_id, dropbox_url, file_name, status, created_at)
+		VALUES ($1, $2, $3, $4, NOW())
+	`, user.ID, "https://test.com/video2.mp4", "test2.mp4", models.VideoUploadStatusUploaded)
+	assert.NoError(t, err)
 
-	// Test
-	vc.GetVideos(c)
-
-	// Assert
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var response struct {
-		Videos []struct {
-			ID         int                      `json:"id"`
-			DropboxURL string                   `json:"dropbox_url"`
-			FileName   string                   `json:"file_name"`
-			Status     models.VideoUploadStatus `json:"status"`
-			CreatedAt  string                   `json:"created_at"`
-		} `json:"videos"`
+	tests := []struct {
+		name           string
+		userEmail      string
+		expectedStatus int
+		expectedCount  int
+	}{
+		{
+			name:           "successful retrieval",
+			userEmail:      user.Email,
+			expectedStatus: http.StatusOK,
+			expectedCount:  2,
+		},
+		{
+			name:           "unauthorized",
+			userEmail:      "",
+			expectedStatus: http.StatusUnauthorized,
+			expectedCount:  0,
+		},
+		{
+			name:           "user not found",
+			userEmail:      "nonexistent@example.com",
+			expectedStatus: http.StatusUnauthorized,
+			expectedCount:  0,
+		},
 	}
-	err = json.Unmarshal(w.Body.Bytes(), &response)
-	assert.NoError(t, err)
-	assert.Len(t, response.Videos, 1)
-	assert.Equal(t, "https://test.com/video.mp4", response.Videos[0].DropboxURL)
-	assert.Equal(t, "test.mp4", response.Videos[0].FileName)
-	assert.Equal(t, models.VideoUploadStatusUploaded, response.Videos[0].Status)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create controller
+			vc := &VideoController{
+				video:        &MockVideo{},
+				db:           testDB,
+				userService:  userService,
+				emailService: emailService,
+			}
+
+			// Setup Gin context
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			// Set user email in context
+			if tt.userEmail != "" {
+				c.Set("user_email", tt.userEmail)
+			}
+
+			// Test
+			vc.GetVideos(c)
+
+			// Assert
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedStatus == http.StatusOK {
+				var response map[string]interface{}
+				err := json.Unmarshal(w.Body.Bytes(), &response)
+				assert.NoError(t, err)
+
+				videos, ok := response["videos"].([]interface{})
+				assert.True(t, ok)
+				assert.Equal(t, tt.expectedCount, len(videos))
+			}
+		})
+	}
 }
