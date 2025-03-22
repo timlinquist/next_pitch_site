@@ -118,7 +118,7 @@ describe('Schedule Component', () => {
 
         renderWithProviders(<Schedule />);
         expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
-        expect(screen.getByText('Please login or signup to schedule appointments')).toBeInTheDocument();
+        expect(screen.getByText('Please log in to schedule appointments')).toBeInTheDocument();
     });
 
     it('prevents non-admin users from creating long events', async () => {
