@@ -12,6 +12,106 @@ import { getApiUrl } from '../utils/api';
 
 const MAX_NON_ADMIN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
+/**
+ * Expands recurring events into their instances based on the current calendar view
+ * @param {Array} events - Array of events from the API
+ * @param {Date} viewStart - Start date of the current calendar view
+ * @param {Date} viewEnd - End date of the current calendar view
+ * @returns {Array} Array of all events including recurring instances
+ */
+const expandRecurringEvents = (events, viewStart, viewEnd) => {
+    if (!events || !Array.isArray(events)) return [];
+    if (!viewStart || !viewEnd) return events; // Return original events if view dates not set
+    
+    console.log('[expandRecurringEvents] Processing events:', events);
+    console.log('[expandRecurringEvents] View range:', { viewStart, viewEnd });
+    
+    const expandedEvents = [];
+    
+    events.forEach(event => {
+        // Add the original event
+        expandedEvents.push(event);
+        
+        // Skip if no recurrence
+        if (!event.recurrence || event.recurrence === 'none') {
+            console.log('[expandRecurringEvents] Skipping non-recurring event:', event.id);
+            return;
+        }
+        
+        console.log('[expandRecurringEvents] Processing recurring event:', event.id, event.recurrence);
+        
+        const originalStart = new Date(event.start_time);
+        const originalEnd = new Date(event.end_time);
+        
+        // Calculate duration in milliseconds
+        const duration = originalEnd - originalStart;
+        
+        // Get the day of week (0-6) for weekly/biweekly recurrence
+        const originalDayOfWeek = originalStart.getDay();
+        
+        // Get the date of month (1-31) for monthly recurrence
+        const originalDateOfMonth = originalStart.getDate();
+        
+        // Start from the day after the original event
+        let currentDate = new Date(originalStart);
+        currentDate.setDate(currentDate.getDate() + 1);
+        
+        // Keep generating instances until we're past the view end
+        while (currentDate <= viewEnd) {
+            let shouldCreateInstance = false;
+            
+            switch (event.recurrence) {
+                case 'weekly':
+                    shouldCreateInstance = currentDate.getDay() === originalDayOfWeek;
+                    break;
+                    
+                case 'biweekly':
+                    // Check if we're on the same day of week and if the week number difference is even
+                    const weekDiff = Math.floor((currentDate - originalStart) / (7 * 24 * 60 * 60 * 1000));
+                    shouldCreateInstance = currentDate.getDay() === originalDayOfWeek && weekDiff % 2 === 0;
+                    break;
+                    
+                case 'monthly':
+                    shouldCreateInstance = currentDate.getDate() === originalDateOfMonth;
+                    break;
+            }
+            
+            if (shouldCreateInstance) {
+                // Create a new instance of the event
+                const instanceStart = new Date(currentDate);
+                instanceStart.setHours(originalStart.getHours(), originalStart.getMinutes());
+                
+                const instanceEnd = new Date(instanceStart);
+                instanceEnd.setTime(instanceStart.getTime() + duration);
+                
+                // Only add instances that fall within the view range
+                if (instanceStart >= viewStart && instanceEnd <= viewEnd) {
+                    console.log('[expandRecurringEvents] Creating instance:', {
+                        originalId: event.id,
+                        instanceStart,
+                        instanceEnd
+                    });
+                    
+                    expandedEvents.push({
+                        ...event,
+                        id: `${event.id}-${instanceStart.getTime()}`, // Unique ID for each instance
+                        start_time: instanceStart.toISOString(),
+                        end_time: instanceEnd.toISOString(),
+                        isRecurringInstance: true,
+                        originalEventId: event.id
+                    });
+                }
+            }
+            
+            // Move to next day
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+    });
+    
+    console.log('[expandRecurringEvents] Final expanded events:', expandedEvents);
+    return expandedEvents;
+};
+
 const Schedule = () => {
     const { user, isAuthenticated, loginWithRedirect, getAccessTokenSilently } = useAuth0();
     const [events, setEvents] = useState([]);
@@ -25,6 +125,7 @@ const Schedule = () => {
     const [isAdmin, setIsAdmin] = useState(false);
     const location = useLocation();
     const [initialEventData, setInitialEventData] = useState(null);
+    const [viewDates, setViewDates] = useState({ start: null, end: null });
 
     const checkAdminStatus = async () => {
         try {
@@ -115,11 +216,34 @@ const Schedule = () => {
         }
     }, [location.state, isAuthenticated]);
 
+    // Add effect to refetch events when view dates change
+    useEffect(() => {
+        if (viewDates.start && viewDates.end) {
+            console.log('[Schedule] View dates changed, refetching events');
+            fetchScheduleEntries();
+        }
+    }, [viewDates]);
+
+    const handleDatesSet = (dateInfo) => {
+        console.log('[Schedule] View dates set:', dateInfo);
+        setViewDates({
+            start: dateInfo.start,
+            end: dateInfo.end
+        });
+    };
+
     const formatEvents = (entries, currentUserEmail) => {
         if (!entries || !Array.isArray(entries)) {
             return [];
         }
-        return entries.map(entry => ({
+
+        console.log('[formatEvents] Processing entries:', entries);
+        console.log('[formatEvents] Current view dates:', viewDates);
+
+        // Expand recurring events using the current view dates
+        const expandedEntries = expandRecurringEvents(entries, viewDates.start, viewDates.end);
+
+        const formattedEvents = expandedEntries.map(entry => ({
             id: entry.id,
             title: isAdmin || entry.user_email === currentUserEmail ? entry.title : 'Unavailable',
             start: entry.start_time,
@@ -131,6 +255,9 @@ const Schedule = () => {
             editable: isAdmin,
             interactive: isAdmin || entry.user_email === currentUserEmail
         }));
+
+        console.log('[formatEvents] Final formatted events:', formattedEvents);
+        return formattedEvents;
     };
 
     const fetchScheduleEntries = async () => {
@@ -324,6 +451,7 @@ const Schedule = () => {
                     select={handleDateSelect}
                     events={events}
                     eventClick={handleEventClick}
+                    datesSet={handleDatesSet}
                     headerToolbar={{
                         left: 'prev,next today',
                         center: 'title',
