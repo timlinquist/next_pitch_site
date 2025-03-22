@@ -73,11 +73,12 @@ describe('expandRecurringEvents', () => {
         
         // Check recurring instance
         expect(result[1]).toMatchObject({
-            id: expect.stringContaining('1-'),
+            id: events[0].id,
+            instanceKey: expect.stringContaining(events[0].id.toString()),
             title: events[0].title,
             recurrence: 'weekly',
             isRecurringInstance: true,
-            originalEventId: 1
+            originalEventId: events[0].id
         });
         
         // Verify the recurring instance is on the next Friday
@@ -109,11 +110,12 @@ describe('expandRecurringEvents', () => {
         
         // Check recurring instance
         expect(result[1]).toMatchObject({
-            id: expect.stringContaining('1-'),
+            id: events[0].id,
+            instanceKey: expect.stringContaining(events[0].id.toString()),
             title: events[0].title,
             recurrence: 'biweekly',
             isRecurringInstance: true,
-            originalEventId: 1
+            originalEventId: events[0].id
         });
         
         // Verify the recurring instance is two weeks later
@@ -146,11 +148,12 @@ describe('expandRecurringEvents', () => {
         
         // Check recurring instance
         expect(result[1]).toMatchObject({
-            id: expect.stringContaining('1-'),
+            id: events[0].id,
+            instanceKey: expect.stringContaining(events[0].id.toString()),
             title: events[0].title,
             recurrence: 'monthly',
             isRecurringInstance: true,
-            originalEventId: 1
+            originalEventId: events[0].id
         });
         
         // Verify the recurring instance is on the same day next month
@@ -184,9 +187,9 @@ describe('expandRecurringEvents', () => {
         // Should have 2 original events plus 1 weekly recurrence plus 1 monthly recurrence
         expect(result).toHaveLength(4);
         
-        // Verify all events have unique IDs
-        const ids = result.map(e => e.id);
-        expect(new Set(ids).size).toBe(ids.length);
+        // Verify all instances have unique keys
+        const instanceKeys = result.map(e => e.instanceKey || e.id);
+        expect(new Set(instanceKeys).size).toBe(instanceKeys.length);
     });
 
     it('should not create instances outside the view range', () => {
