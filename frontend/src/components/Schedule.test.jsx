@@ -17,7 +17,7 @@ vi.mock('../contexts/Auth0Context', () => ({
 
 // Mock the FullCalendar component
 vi.mock('@fullcalendar/react', () => ({
-    default: ({ events, select }) => {
+    default: ({ events, loading, select }) => {
         // Store the select handler globally so we can call it in our tests
         window.handleDateSelect = select;
         return (
@@ -31,6 +31,7 @@ vi.mock('@fullcalendar/react', () => ({
                         {event.title}
                     </div>
                 ))}
+                {loading && <div>Loading calendar...</div>}
             </div>
         );
     }
@@ -74,17 +75,9 @@ describe('Schedule Component', () => {
         });
 
         // Setup default fetch mock
-        global.fetch.mockImplementation((url) => {
-            if (url.includes('users/me')) {
-                return Promise.resolve({
-                    ok: true,
-                    json: () => Promise.resolve({ is_admin: false })
-                });
-            }
-            return Promise.resolve({
-                ok: true,
-                json: () => Promise.resolve(mockEvents)
-            });
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(mockEvents)
         });
     });
 
@@ -108,7 +101,7 @@ describe('Schedule Component', () => {
         expect(screen.getByTestId('calendar-event')).toBeInTheDocument();
     });
 
-    it('shows login prompt when not authenticated', async () => {
+    it('shows login prompt when not authenticated', () => {
         useAuth0.mockReturnValue({
             isAuthenticated: false,
             loginWithRedirect: vi.fn(),
@@ -118,7 +111,7 @@ describe('Schedule Component', () => {
 
         renderWithProviders(<Schedule />);
         expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
-        expect(screen.getByText('Please log in to schedule appointments')).toBeInTheDocument();
+        expect(screen.getByText('Please login or signup to schedule appointments')).toBeInTheDocument();
     });
 
     it('prevents non-admin users from creating long events', async () => {
@@ -147,9 +140,7 @@ describe('Schedule Component', () => {
         };
 
         // Call the select handler directly
-        await act(async () => {
-            window.handleDateSelect(selectInfo);
-        });
+        window.handleDateSelect(selectInfo);
 
         // Wait for the error message to appear in an alert
         await waitFor(() => {
@@ -165,11 +156,10 @@ describe('Schedule Component', () => {
             user: { email: 'test@example.com' },
             getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
         });
-
         useAuth0Context.mockReturnValue({ isAdmin: true });
 
-        // Mock existing event
-        global.fetch = vi.fn().mockImplementation((url) => {
+        // Mock fetch responses
+        global.fetch.mockImplementation((url) => {
             if (url.includes('users/me')) {
                 return Promise.resolve({
                     ok: true,
@@ -196,8 +186,13 @@ describe('Schedule Component', () => {
             expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
         });
 
+        // Wait for the existing event to be displayed
+        await waitFor(() => {
+            expect(screen.getByText('Unavailable')).toBeInTheDocument();
+        });
+
         // Simulate selecting an overlapping time slot
-        await act(async () => {
+        act(() => {
             window.handleDateSelect({
                 start: new Date('2025-03-13T22:30:00.000Z'),
                 end: new Date('2025-03-13T23:30:00.000Z')
@@ -212,15 +207,6 @@ describe('Schedule Component', () => {
     });
 
     it('shows different styles for user events vs other events', async () => {
-        // Mock authenticated user
-        useAuth0.mockReturnValue({
-            isAuthenticated: true,
-            user: { email: 'test@example.com' },
-            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
-        });
-
-        useAuth0Context.mockReturnValue({ isAdmin: false });
-
         const otherUserEvents = [
             {
                 id: 1,
@@ -232,17 +218,9 @@ describe('Schedule Component', () => {
             }
         ];
 
-        global.fetch = vi.fn().mockImplementation((url) => {
-            if (url.includes('users/me')) {
-                return Promise.resolve({
-                    ok: true,
-                    json: () => Promise.resolve({ is_admin: false })
-                });
-            }
-            return Promise.resolve({
-                ok: true,
-                json: () => Promise.resolve(otherUserEvents)
-            });
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve(otherUserEvents)
         });
 
         renderWithProviders(<Schedule />);
@@ -252,10 +230,7 @@ describe('Schedule Component', () => {
             expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
         });
 
-        // Wait for the event to be rendered
-        await waitFor(() => {
-            const event = screen.getByTestId('calendar-event');
-            expect(event).toHaveClass('other-event');
-        });
+        const event = screen.getByTestId('calendar-event');
+        expect(event).toHaveClass('other-event');
     });
 });
