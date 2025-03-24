@@ -101,8 +101,8 @@ func SetupTestDB(t interface{ Fatal(args ...interface{}) }) *sql.DB {
 	dbname := "nextpitch_test"
 	sslmode := "disable"
 
+	// Connect to the test database
 	connStr := "host=" + host + " port=" + port + " user=" + user + " password=" + password + " dbname=" + dbname + " sslmode=" + sslmode
-
 	testDB, err := sql.Open("postgres", connStr)
 	if err != nil {
 		t.Fatal(fmt.Sprintf("Failed to connect to test database: %v", err))

@@ -124,6 +124,16 @@ func (h *ScheduleHandler) DeleteScheduleEntry(c *gin.Context) {
 		return
 	}
 
+	// Get delete_following parameter
+	deleteFollowing := false
+	if deleteFollowingStr := c.Query("delete_following"); deleteFollowingStr != "" {
+		deleteFollowing, err = strconv.ParseBool(deleteFollowingStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid delete_following parameter"})
+			return
+		}
+	}
+
 	// Get user email from context
 	userEmail, exists := c.Get("user_email")
 	if !exists {
@@ -139,7 +149,7 @@ func (h *ScheduleHandler) DeleteScheduleEntry(c *gin.Context) {
 	}
 
 	// Delete the entry
-	if err := h.scheduleService.DeleteScheduleEntry(entryID, userEmail.(string)); err != nil {
+	if err := h.scheduleService.DeleteScheduleEntry(entryID, userEmail.(string), deleteFollowing); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

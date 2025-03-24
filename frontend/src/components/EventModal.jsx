@@ -12,7 +12,8 @@ const RECURRENCE_OPTIONS = {
 const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [recurrence, setRecurrence] = useState(RECURRENCE_OPTIONS.NONE);
+    const [recurrence, setRecurrence] = useState(RECURRENCE_OPTIONS.BIWEEKLY);
+    const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
     const { isAuthenticated, loginWithRedirect, user } = useAuth0();
     const location = useLocation();
 
@@ -22,14 +23,19 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
             if (initialData) {
                 setTitle(initialData.title ?? '');
                 setDescription(initialData.description ?? '');
-                setRecurrence(initialData.recurrence ?? RECURRENCE_OPTIONS.NONE);
+                setRecurrence(initialData.recurrence ?? RECURRENCE_OPTIONS.BIWEEKLY);
+                setRecurrenceEndDate(initialData.recurrence_end_date ?? '');
             } else {
                 setTitle('');
                 setDescription('');
-                setRecurrence(RECURRENCE_OPTIONS.NONE);
+                setRecurrence(RECURRENCE_OPTIONS.BIWEEKLY);
+                // Set default end date to 6 months from start time
+                const defaultEndDate = new Date(startTime);
+                defaultEndDate.setMonth(defaultEndDate.getMonth() + 6);
+                setRecurrenceEndDate(defaultEndDate.toISOString().split('T')[0]);
             }
         }
-    }, [isOpen, initialData]);
+    }, [isOpen, initialData, startTime]);
 
     if (!isOpen) return null;
 
@@ -39,6 +45,7 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
             title,
             description,
             recurrence,
+            recurrence_end_date: recurrenceEndDate,
             selectedSlot: {
                 start: startTime.toISOString(),
                 end: endTime.toISOString()
@@ -61,17 +68,25 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit({
+        const eventData = {
             title,
             description,
             start_time: startTime,
             end_time: endTime,
             user_email: user?.email,
             recurrence
-        });
+        };
+
+        // Only include recurrence_end_date if a recurring event is selected
+        if (recurrence !== RECURRENCE_OPTIONS.NONE && recurrenceEndDate) {
+            eventData.recurrence_end_date = new Date(recurrenceEndDate);
+        }
+
+        onSubmit(eventData);
         setTitle('');
         setDescription('');
-        setRecurrence(RECURRENCE_OPTIONS.NONE);
+        setRecurrence(RECURRENCE_OPTIONS.BIWEEKLY);
+        setRecurrenceEndDate('');
         onClose();
     };
 
@@ -112,6 +127,19 @@ const EventModal = ({ isOpen, onClose, onSubmit, startTime, endTime, initialData
                             <option value={RECURRENCE_OPTIONS.MONTHLY}>Monthly</option>
                         </select>
                     </div>
+                    {recurrence !== RECURRENCE_OPTIONS.NONE && (
+                        <div className="form-group">
+                            <label htmlFor="recurrenceEndDate">End Date:</label>
+                            <input
+                                type="date"
+                                id="recurrenceEndDate"
+                                value={recurrenceEndDate}
+                                onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                                min={startTime.toISOString().split('T')[0]}
+                                required
+                            />
+                        </div>
+                    )}
                     {!isAuthenticated && (
                         <div className="error">
                             Please <button onClick={handleLogin} className="link-button">Login</button> to create an appointment
