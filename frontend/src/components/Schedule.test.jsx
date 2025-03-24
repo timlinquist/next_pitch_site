@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, waitForElementToBeRemoved, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import Schedule from './Schedule';
+import Schedule, { formatEvents } from './Schedule';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useAuth0Context } from '../contexts/Auth0Context';
 
@@ -232,5 +232,74 @@ describe('Schedule Component', () => {
 
         const event = screen.getByTestId('calendar-event');
         expect(event).toHaveClass('other-event');
+    });
+
+    describe('formatEvents function', () => {
+        const mockUser = {
+            email: 'test@example.com',
+            name: 'Test User'
+        };
+
+        it('handles null input', () => {
+            const result = formatEvents(null, mockUser);
+            expect(result).toEqual([]);
+        });
+
+        it('handles undefined input', () => {
+            const result = formatEvents(undefined, mockUser);
+            expect(result).toEqual([]);
+        });
+
+        it('handles empty array input', () => {
+            const result = formatEvents([], mockUser);
+            expect(result).toEqual([]);
+        });
+
+        it('handles array with null or undefined entries', () => {
+            const result = formatEvents([null, undefined], mockUser);
+            expect(result).toEqual([]);
+        });
+
+        it('formats a valid event entry', () => {
+            const mockEvent = {
+                id: 1,
+                title: 'Test Event',
+                start_time: '2024-03-24T10:00:00Z',
+                end_time: '2024-03-24T11:00:00Z',
+                user_email: 'test@example.com'
+            };
+
+            const result = formatEvents([mockEvent], mockUser);
+            expect(result).toHaveLength(1);
+            expect(result[0]).toMatchObject({
+                id: 1,
+                title: 'Test Event',
+                className: 'user-event',
+                extendedProps: expect.objectContaining({
+                    isUnavailable: false
+                })
+            });
+        });
+
+        it('formats an event from another user as unavailable', () => {
+            const mockEvent = {
+                id: 1,
+                title: 'Other User Event',
+                start_time: '2024-03-24T10:00:00Z',
+                end_time: '2024-03-24T11:00:00Z',
+                user_email: 'other@example.com'
+            };
+
+            const result = formatEvents([mockEvent], mockUser);
+            expect(result).toHaveLength(1);
+            expect(result[0]).toMatchObject({
+                id: 1,
+                title: 'Unavailable',
+                className: 'other-event',
+                extendedProps: expect.objectContaining({
+                    isUnavailable: true
+                })
+            });
+        });
     });
 });

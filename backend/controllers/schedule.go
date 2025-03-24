@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -48,7 +49,7 @@ func (sc *ScheduleController) CreateScheduleEntry(c *gin.Context) {
 	// Check if user is admin
 	isAdmin, err := sc.userService.IsAdmin(userEmail.(string))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check user permissions"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to check user permissions: %v", err)})
 		return
 	}
 
@@ -59,7 +60,7 @@ func (sc *ScheduleController) CreateScheduleEntry(c *gin.Context) {
 			"event overlaps with existing events":
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create schedule entry: %v", err)})
 		}
 		return
 	}
@@ -122,6 +123,16 @@ func (sc *ScheduleController) DeleteScheduleEntry(c *gin.Context) {
 		return
 	}
 
+	// Get delete_following parameter
+	deleteFollowing := false
+	if deleteFollowingStr := c.Query("delete_following"); deleteFollowingStr != "" {
+		deleteFollowing, err = strconv.ParseBool(deleteFollowingStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid delete_following parameter"})
+			return
+		}
+	}
+
 	// Get user email from context
 	userEmail, exists := c.Get("user_email")
 	if !exists {
@@ -129,7 +140,7 @@ func (sc *ScheduleController) DeleteScheduleEntry(c *gin.Context) {
 		return
 	}
 
-	err = sc.scheduleService.DeleteScheduleEntry(entryID, userEmail.(string))
+	err = sc.scheduleService.DeleteScheduleEntry(entryID, userEmail.(string), deleteFollowing)
 	if err != nil {
 		switch err.Error() {
 		case "schedule entry not found or unauthorized":

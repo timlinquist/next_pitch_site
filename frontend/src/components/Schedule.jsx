@@ -9,7 +9,47 @@ import EventModal from './EventModal';
 import EventDetailsModal from './EventDetailsModal';
 import '../styles/calendar.css';
 import { getApiUrl } from '../utils/api';
-import { expandRecurringEvents } from '../utils/recurrence';
+
+/**
+ * Formats event entries for display in the calendar
+ * @param {Array} entries - Array of event entries
+ * @param {Object} user - Current user object
+ * @returns {Array} Formatted events array
+ */
+export const formatEvents = (entries, user) => {
+    if (!entries || !Array.isArray(entries)) {
+        return [];
+    }
+
+    return entries.map(entry => {
+        if (!entry) return null;
+        
+        // Handle both old and new data structures
+        const event = entry.event || entry;
+        const isAdmin = entry.user?.role === 'admin' || entry.is_admin;
+        const isUnavailable = event.status === 'unavailable' || (user && event.user_email !== user.email);
+        
+        return {
+            id: event.id,
+            title: isUnavailable ? 'Unavailable' : event.title,
+            start: new Date(event.start_time),
+            end: new Date(event.end_time),
+            backgroundColor: isUnavailable ? '#ff4444' : (isAdmin ? '#4CAF50' : '#2196F3'),
+            borderColor: isUnavailable ? '#cc0000' : (isAdmin ? '#388E3C' : '#1976D2'),
+            textColor: '#ffffff',
+            className: user && event.user_email === user.email ? 'user-event' : 'other-event',
+            extendedProps: {
+                description: event.description,
+                user_email: event.user_email,
+                recurrence: event.recurrence,
+                parent_event_id: event.parent_event_id,
+                user: entry.user,
+                isAdmin,
+                isUnavailable
+            }
+        };
+    }).filter(Boolean);
+};
 
 const MAX_NON_ADMIN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
@@ -133,34 +173,6 @@ const Schedule = () => {
         });
     };
 
-    const formatEvents = (entries, currentUserEmail) => {
-        if (!entries || !Array.isArray(entries)) {
-            return [];
-        }
-
-        console.log('[formatEvents] Processing entries:', entries);
-        console.log('[formatEvents] Current view dates:', viewDates);
-
-        // Expand recurring events using the current view dates
-        const expandedEntries = expandRecurringEvents(entries, viewDates.start, viewDates.end);
-
-        const formattedEvents = expandedEntries.map(entry => ({
-            id: entry.id,
-            title: isAdmin || entry.user_email === currentUserEmail ? entry.title : 'Unavailable',
-            start: entry.start_time,
-            end: entry.end_time,
-            description: isAdmin || entry.user_email === currentUserEmail ? entry.description : '',
-            user_email: entry.user_email,
-            recurrence: entry.recurrence,
-            className: entry.user_email === currentUserEmail ? 'user-event' : 'other-event',
-            editable: isAdmin,
-            interactive: isAdmin || entry.user_email === currentUserEmail
-        }));
-
-        console.log('[formatEvents] Final formatted events:', formattedEvents);
-        return formattedEvents;
-    };
-
     const fetchScheduleEntries = async () => {
         try {
             console.log('[Schedule] Fetching schedule entries, user:', user?.email);
@@ -182,7 +194,7 @@ const Schedule = () => {
             const data = await response.json();
             console.log('[Schedule] Received data:', data);
             
-            const formattedEvents = formatEvents(data, user?.email);
+            const formattedEvents = formatEvents(data, user);
             console.log('[Schedule] Formatted events:', formattedEvents);
             
             setEvents(formattedEvents);
@@ -251,7 +263,8 @@ const Schedule = () => {
             end: clickInfo.event.end,
             description: clickInfo.event.extendedProps.description,
             user_email: eventUserEmail,
-            recurrence: clickInfo.event.extendedProps.recurrence || 'none'
+            recurrence: clickInfo.event.extendedProps.recurrence || 'none',
+            parent_event_id: clickInfo.event.extendedProps.parent_event_id
         });
 
         setIsDetailsModalOpen(true);
@@ -272,7 +285,8 @@ const Schedule = () => {
                     start_time: eventData.start_time.toISOString(),
                     end_time: eventData.end_time.toISOString(),
                     user_email: user.email,
-                    recurrence: eventData.recurrence || 'none'
+                    recurrence: eventData.recurrence || 'none',
+                    recurrence_end_date: eventData.recurrence_end_date ? eventData.recurrence_end_date.toISOString() : null
                 }),
             });
 
@@ -282,7 +296,7 @@ const Schedule = () => {
             }
 
             const newEvent = await response.json();
-            const formattedEvent = formatEvents([newEvent], user.email)[0];
+            const formattedEvent = formatEvents([{ event: newEvent }])[0];
 
             setEvents(prevEvents => [...prevEvents, formattedEvent]);
             setIsModalOpen(false);
@@ -294,10 +308,10 @@ const Schedule = () => {
         }
     };
 
-    const handleEventDelete = async (eventId) => {
+    const handleEventDelete = async (eventId, deleteFollowing = false) => {
         try {
             const token = await getAccessTokenSilently();
-            const response = await fetch(getApiUrl(`schedule/${eventId}`), {
+            const response = await fetch(getApiUrl(`schedule/${eventId}?delete_following=${deleteFollowing}`), {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -305,7 +319,8 @@ const Schedule = () => {
             });
 
             if (!response.ok) {
-                throw new Error('Failed to delete event');
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to delete event');
             }
 
             // Convert eventId to string for consistent comparison
@@ -316,7 +331,7 @@ const Schedule = () => {
             setDeleteError(null);
         } catch (error) {
             console.error('Error deleting event:', error);
-            setDeleteError('Failed to delete event');
+            setDeleteError(error.message || 'Failed to delete event');
         }
     };
 

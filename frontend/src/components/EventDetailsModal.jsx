@@ -8,6 +8,7 @@ const formatRecurrence = (recurrence) => {
 
 const EventDetailsModal = ({ isOpen, onClose, event, onDelete }) => {
     const [showConfirm, setShowConfirm] = useState(false);
+    const [deleteFollowing, setDeleteFollowing] = useState(false);
 
     if (!isOpen || !event) return null;
 
@@ -20,7 +21,7 @@ const EventDetailsModal = ({ isOpen, onClose, event, onDelete }) => {
         e.stopPropagation();
         console.log('Event being deleted:', event);
         console.log('Event ID being passed:', event.id);
-        onDelete(event.id);
+        onDelete(event.id, deleteFollowing);
     };
 
     const handleCancelDelete = (e) => {
@@ -58,6 +59,18 @@ const EventDetailsModal = ({ isOpen, onClose, event, onDelete }) => {
                 {showConfirm && (
                     <div className="delete-confirmation">
                         <p>Are you sure you want to delete this event?</p>
+                        {(event.recurrence !== 'none' || event.parent_event_id) && (
+                            <div className="form-group">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        checked={deleteFollowing}
+                                        onChange={(e) => setDeleteFollowing(e.target.checked)}
+                                    />
+                                    Delete following events in this series
+                                </label>
+                            </div>
+                        )}
                         <div className="confirmation-actions">
                             <button className="btn btn-secondary" onClick={handleCancelDelete}>
                                 Cancel

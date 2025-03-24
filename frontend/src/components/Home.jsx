@@ -11,7 +11,7 @@ const Home = () => {
             <div className="home-container">
                 <div className="home-background"></div>
                 <div className="home-content">
-                    <h1>Your Most Important Pitch ... is <span className="highlight">YOUR NEXT PITCH!</span></h1>
+                    <h1>Your Most Important Pitch is this pitch! After that it's ... <span className="highlight">YOUR NEXT PITCH!</span></h1>
                 </div>
             </div>
         </>
