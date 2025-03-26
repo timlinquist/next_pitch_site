@@ -18,6 +18,15 @@ const (
 	AdminEmail = "coachtim@thenextpitch.org"
 )
 
+// EmailServiceInterface defines the interface for email service
+type EmailServiceInterface interface {
+	SendVideoUploadNotification(user *models.User, fileName string) error
+	SendContactEmail(form models.ContactForm) error
+	SendAppointmentCancellationEmail(entry *models.ScheduleEntry) error
+	SendAppointmentConfirmationEmail(entry *models.ScheduleEntry) error
+	QueueEmail(data EmailData)
+}
+
 type EmailType int
 
 func (e EmailType) String() string {

@@ -20,9 +20,16 @@ type ScheduleFixtures struct {
 	EventToDelete models.ScheduleEntry `json:"event_to_delete"`
 }
 
+type VideoFixtures struct {
+	TestVideo     models.VideoUpload `json:"test_video"`
+	NewVideo      models.VideoUpload `json:"new_video"`
+	VideoToDelete models.VideoUpload `json:"video_to_delete"`
+}
+
 type TestDB struct {
-	DB       *sql.DB
-	Fixtures *ScheduleFixtures
+	DB               *sql.DB
+	ScheduleFixtures *ScheduleFixtures
+	VideoFixtures    *VideoFixtures
 }
 
 func LoadFixtures(t interface{ Fatal(args ...interface{}) }) *ScheduleFixtures {

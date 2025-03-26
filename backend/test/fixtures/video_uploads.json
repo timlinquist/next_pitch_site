@@ -1,0 +1,20 @@
+{
+  "test_video": {
+    "user_id": 1,
+    "s3_url": "videos/test.mp4",
+    "file_name": "test.mp4",
+    "status": "uploaded"
+  },
+  "new_video": {
+    "user_id": 1,
+    "s3_url": "videos/new.mp4",
+    "file_name": "new.mp4",
+    "status": "uploaded"
+  },
+  "video_to_delete": {
+    "user_id": 1,
+    "s3_url": "videos/delete.mp4",
+    "file_name": "delete.mp4",
+    "status": "uploaded"
+  }
+} 
