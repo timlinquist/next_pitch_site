@@ -342,33 +342,33 @@ const Schedule = () => {
 
     return (
         <AuthRequired returnTo="/schedule">
-            <div className="container">
+        <div className="container">
                 {error && (
                     <div role="alert" className="error-message">
                         {error}
                     </div>
                 )}
-                <div className="section">
-                    <h1>Schedule a Consultation</h1>
-                    <p>View our availability and schedule a consultation to discuss your pitch needs. We offer flexible scheduling options to accommodate your timeline.</p>
-                </div>
-                <div className="calendar-container">
-                    <FullCalendar
-                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            <div className="section">
+                <h1>Schedule a Consultation</h1>
+                <p>View our availability and schedule a consultation to discuss your pitch needs. We offer flexible scheduling options to accommodate your timeline.</p>
+            </div>
+            <div className="calendar-container">
+                <FullCalendar
+                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
                         initialView="timeGridWeek"
                         selectable={true}
                         select={handleDateSelect}
                         events={events}
                         eventClick={handleEventClick}
                         datesSet={handleDatesSet}
-                        headerToolbar={{
-                            left: 'prev,next today',
-                            center: 'title',
-                            right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                        }}
+                    headerToolbar={{
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                    }}
                         slotMinTime="08:00:00"
                         slotMaxTime="20:00:00"
-                        allDaySlot={false}
+                    allDaySlot={false}
                         selectConstraint={{
                             startTime: '08:00',
                             endTime: '20:00',

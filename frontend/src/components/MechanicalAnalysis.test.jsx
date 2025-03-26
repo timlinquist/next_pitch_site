@@ -51,15 +51,15 @@ describe('MechanicalAnalysis', () => {
     it('validates file size before upload', () => {
         render(<MechanicalAnalysis />);
         
-        // Create a file larger than 10MB
-        const largeFile = new File(['x'.repeat(11 * 1024 * 1024)], 'large.mp4', { type: 'video/mp4' });
+        // Create a file larger than MAX_FILE_SIZE
+        const largeFile = new File(['x'.repeat(251 * 1024 * 1024)], 'large.mp4', { type: 'video/mp4' });
         
         // Get the front video input and trigger change
         const frontInput = screen.getByTestId('front-video-input');
         fireEvent.change(frontInput, { target: { files: [largeFile] } });
         
         // Check for error message
-        expect(screen.getByText('File too large. Maximum size is 10MB')).toBeInTheDocument();
+        expect(screen.getByText('File too large. Maximum size is 250MB')).toBeInTheDocument();
         
         // Verify fetch was not called
         expect(fetch).not.toHaveBeenCalled();

@@ -13,20 +13,20 @@ import (
 	"nextpitch.com/backend/services"
 )
 
-const maxFileSize = 10 * 1024 * 1024 // 10MB in bytes
+const maxFileSize = 250 * 1024 * 1024 // 250MB in bytes
 
 // VideoController handles video-related HTTP requests
 type VideoController struct {
 	db           *sql.DB
 	userService  *services.UserService
-	emailService *services.EmailService
+	emailService services.EmailServiceInterface
 }
 
 // EnvLoader is a function type for loading environment variables
 type EnvLoader func(filenames ...string) error
 
 // NewVideoController creates a new video controller
-func NewVideoController(db *sql.DB, userService *services.UserService, emailService *services.EmailService, envLoader ...EnvLoader) (*VideoController, error) {
+func NewVideoController(db *sql.DB, userService *services.UserService, emailService services.EmailServiceInterface, envLoader ...EnvLoader) (*VideoController, error) {
 	// Load environment variables
 	loader := godotenv.Load
 	if len(envLoader) > 0 {

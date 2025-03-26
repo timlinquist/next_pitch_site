@@ -3,7 +3,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import '../styles/mechanical-analysis.css';
 import config from '../config';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+const MAX_FILE_SIZE = 250 * 1024 * 1024; // 250MB in bytes
 
 const MechanicalAnalysis = () => {
     const { getAccessTokenSilently } = useAuth0();
