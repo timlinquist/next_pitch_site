@@ -7,6 +7,7 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { useLocation } from 'react-router-dom';
 import EventModal from './EventModal';
 import EventDetailsModal from './EventDetailsModal';
+import AuthRequired from './AuthRequired';
 import '../styles/calendar.css';
 import { getApiUrl } from '../utils/api';
 
@@ -54,7 +55,7 @@ export const formatEvents = (entries, user) => {
 const MAX_NON_ADMIN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
 const Schedule = () => {
-    const { user, isAuthenticated, loginWithRedirect, getAccessTokenSilently } = useAuth0();
+    const { user, getAccessTokenSilently } = useAuth0();
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -95,17 +96,17 @@ const Schedule = () => {
     };
 
     useEffect(() => {
-        if (isAuthenticated) {
+        if (user) {
             checkAdminStatus();
             fetchScheduleEntries();
         } else {
             setLoading(false);
         }
-    }, [isAuthenticated, getAccessTokenSilently]);
+    }, [user, getAccessTokenSilently]);
 
     useEffect(() => {
         // Handle redirect with selected slot
-        if (isAuthenticated) {
+        if (user) {
             let slot = null;
             let formData = null;
 
@@ -155,15 +156,15 @@ const Schedule = () => {
                 }
             }
         }
-    }, [location.state, isAuthenticated]);
+    }, [location.state, user]);
 
     // Add effect to refetch events when view dates change
     useEffect(() => {
-        if (viewDates.start && viewDates.end) {
+        if (user && viewDates.start && viewDates.end) {
             console.log('[Schedule] View dates changed, refetching events');
             fetchScheduleEntries();
         }
-    }, [viewDates]);
+    }, [viewDates, user]);
 
     const handleDatesSet = (dateInfo) => {
         console.log('[Schedule] View dates set:', dateInfo);
@@ -207,7 +208,7 @@ const Schedule = () => {
     };
 
     const handleDateSelect = (selectInfo) => {
-        if (!isAuthenticated) {
+        if (!user) {
             setError('Please log in to create events');
             return;
         }
@@ -242,7 +243,7 @@ const Schedule = () => {
     };
 
     const handleEventClick = (clickInfo) => {
-        if (!isAuthenticated) {
+        if (!user) {
             setError('Please log in to view event details');
             return;
         }
@@ -339,86 +340,79 @@ const Schedule = () => {
         return <div className="container">Loading...</div>;
     }
 
-    if (!isAuthenticated) {
-        return (
-            <div className="container">
-                <p>Please login or signup to schedule appointments</p>
-                <button onClick={() => loginWithRedirect({ appState: { returnTo: '/schedule' } })} className="btn">Log In</button>
-            </div>
-        );
-    }
-
     return (
-        <div className="container">
-            {error && (
-                <div role="alert" className="error-message">
-                    {error}
+        <AuthRequired returnTo="/schedule">
+            <div className="container">
+                {error && (
+                    <div role="alert" className="error-message">
+                        {error}
+                    </div>
+                )}
+                <div className="section">
+                    <h1>Schedule a Consultation</h1>
+                    <p>View our availability and schedule a consultation to discuss your pitch needs. We offer flexible scheduling options to accommodate your timeline.</p>
                 </div>
-            )}
-            <div className="section">
-                <h1>Schedule a Consultation</h1>
-                <p>View our availability and schedule a consultation to discuss your pitch needs. We offer flexible scheduling options to accommodate your timeline.</p>
+                <div className="calendar-container">
+                    <FullCalendar
+                        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                        initialView="timeGridWeek"
+                        selectable={true}
+                        select={handleDateSelect}
+                        events={events}
+                        eventClick={handleEventClick}
+                        datesSet={handleDatesSet}
+                        headerToolbar={{
+                            left: 'prev,next today',
+                            center: 'title',
+                            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                        }}
+                        slotMinTime="08:00:00"
+                        slotMaxTime="20:00:00"
+                        allDaySlot={false}
+                        selectConstraint={{
+                            startTime: '08:00',
+                            endTime: '20:00',
+                            daysOfWeek: [0, 1, 2, 3, 4, 5, 6]
+                        }}
+                        businessHours={{
+                            daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+                            startTime: '08:00',
+                            endTime: '20:00'
+                        }}
+                        selectOverlap={false}
+                        loading={loading}
+                    />
+                </div>
+                {isModalOpen && selectedSlot && (
+                    <EventModal
+                        isOpen={isModalOpen}
+                        onClose={() => {
+                            setIsModalOpen(false);
+                            setSelectedSlot(null);
+                            setInitialEventData(null);
+                        }}
+                        onSubmit={handleEventSubmit}
+                        startTime={selectedSlot.start}
+                        endTime={selectedSlot.end}
+                        initialData={initialEventData}
+                    />
+                )}
+                {isDetailsModalOpen && selectedEvent && (
+                    <EventDetailsModal
+                        isOpen={isDetailsModalOpen}
+                        onClose={() => {
+                            setIsDetailsModalOpen(false);
+                            setSelectedEvent(null);
+                        }}
+                        event={selectedEvent}
+                        onDelete={handleEventDelete}
+                        deleteError={deleteError}
+                        isAdmin={isAdmin}
+                        isUsersEvent={selectedEvent.user_email === user?.email}
+                    />
+                )}
             </div>
-            <div className="calendar-container">
-                <FullCalendar
-                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                    initialView="timeGridWeek"
-                    selectable={true}
-                    select={handleDateSelect}
-                    events={events}
-                    eventClick={handleEventClick}
-                    datesSet={handleDatesSet}
-                    headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,timeGridWeek,timeGridDay'
-                    }}
-                    slotMinTime="08:00:00"
-                    slotMaxTime="20:00:00"
-                    allDaySlot={false}
-                    selectConstraint={{
-                        startTime: '08:00',
-                        endTime: '20:00',
-                        daysOfWeek: [0, 1, 2, 3, 4, 5, 6]
-                    }}
-                    businessHours={{
-                        daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-                        startTime: '08:00',
-                        endTime: '20:00'
-                    }}
-                    selectOverlap={false}
-                    loading={loading}
-                />
-            </div>
-            {isModalOpen && selectedSlot && (
-                <EventModal
-                    isOpen={isModalOpen}
-                    onClose={() => {
-                        setIsModalOpen(false);
-                        setSelectedSlot(null);
-                        setInitialEventData(null);
-                    }}
-                    onSubmit={handleEventSubmit}
-                    startTime={selectedSlot.start}
-                    endTime={selectedSlot.end}
-                    initialData={initialEventData}
-                />
-            )}
-            {isDetailsModalOpen && selectedEvent && (
-                <EventDetailsModal
-                    isOpen={isDetailsModalOpen}
-                    onClose={() => {
-                        setIsDetailsModalOpen(false);
-                        setSelectedEvent(null);
-                    }}
-                    event={selectedEvent}
-                    onDelete={handleEventDelete}
-                    deleteError={deleteError}
-                    isAdmin={isAdmin}
-                    isUsersEvent={selectedEvent.user_email === user?.email}
-                />
-            )}
-        </div>
+        </AuthRequired>
     );
 };
 

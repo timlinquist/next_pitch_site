@@ -16,26 +16,26 @@ const (
 
 // VideoUpload represents a video upload record in the database
 type VideoUpload struct {
-	ID         int               `json:"id"`
-	UserID     int               `json:"user_id"`
-	DropboxURL string            `json:"dropbox_url"`
-	FileName   string            `json:"file_name"`
-	Status     VideoUploadStatus `json:"status"`
-	CreatedAt  time.Time         `json:"created_at"`
-	UpdatedAt  time.Time         `json:"updated_at"`
+	ID        int               `json:"id"`
+	UserID    int               `json:"user_id"`
+	S3URL     string            `json:"s3_url"`
+	FileName  string            `json:"file_name"`
+	Status    VideoUploadStatus `json:"status"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
 }
 
 // CreateVideoUpload creates a new video upload record
 func CreateVideoUpload(db *sql.DB, upload *VideoUpload) error {
 	query := `
-		INSERT INTO video_uploads (user_id, dropbox_url, file_name, status)
+		INSERT INTO video_uploads (user_id, s3_url, file_name, status)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id, created_at, updated_at
 	`
 	return db.QueryRow(
 		query,
 		upload.UserID,
-		upload.DropboxURL,
+		upload.S3URL,
 		upload.FileName,
 		upload.Status,
 	).Scan(&upload.ID, &upload.CreatedAt, &upload.UpdatedAt)
@@ -45,14 +45,14 @@ func CreateVideoUpload(db *sql.DB, upload *VideoUpload) error {
 func GetVideoUploadByID(db *sql.DB, id int) (*VideoUpload, error) {
 	upload := &VideoUpload{}
 	query := `
-		SELECT id, user_id, dropbox_url, file_name, status, created_at, updated_at
+		SELECT id, user_id, s3_url, file_name, status, created_at, updated_at
 		FROM video_uploads
 		WHERE id = $1
 	`
 	err := db.QueryRow(query, id).Scan(
 		&upload.ID,
 		&upload.UserID,
-		&upload.DropboxURL,
+		&upload.S3URL,
 		&upload.FileName,
 		&upload.Status,
 		&upload.CreatedAt,
@@ -65,9 +65,9 @@ func GetVideoUploadByID(db *sql.DB, id int) (*VideoUpload, error) {
 }
 
 // GetVideoUploadsByUserID retrieves all video uploads for a specific user
-func GetVideoUploadsByUserID(db *sql.DB, userID int) ([]*VideoUpload, error) {
+func GetVideoUploadsByUserID(db *sql.DB, userID int) ([]VideoUpload, error) {
 	query := `
-		SELECT id, user_id, dropbox_url, file_name, status, created_at, updated_at
+		SELECT id, user_id, s3_url, file_name, status, created_at, updated_at
 		FROM video_uploads
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -78,13 +78,13 @@ func GetVideoUploadsByUserID(db *sql.DB, userID int) ([]*VideoUpload, error) {
 	}
 	defer rows.Close()
 
-	var uploads []*VideoUpload
+	var uploads []VideoUpload
 	for rows.Next() {
-		upload := &VideoUpload{}
+		var upload VideoUpload
 		err := rows.Scan(
 			&upload.ID,
 			&upload.UserID,
-			&upload.DropboxURL,
+			&upload.S3URL,
 			&upload.FileName,
 			&upload.Status,
 			&upload.CreatedAt,
