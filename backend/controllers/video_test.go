@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -19,18 +18,6 @@ import (
 	"nextpitch.com/backend/test/helpers"
 )
 
-// MockVideo implements VideoUploader interface for testing
-type MockVideo struct {
-	uploadFunc func(file io.Reader, filename string) (string, string, error)
-}
-
-func (m *MockVideo) Upload(file io.Reader, filename string) (string, string, error) {
-	if m.uploadFunc != nil {
-		return m.uploadFunc(file, filename)
-	}
-	return "/test/path", "https://test.com/video.mp4", nil
-}
-
 func TestNewVideoController(t *testing.T) {
 	// Setup
 	testDB := helpers.SetupTestDB(t)
@@ -42,18 +29,22 @@ func TestNewVideoController(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		envToken    string
+		envVars     map[string]string
 		wantErr     bool
 		errContains string
 	}{
 		{
-			name:     "successful initialization",
-			envToken: "test-token",
-			wantErr:  false,
+			name: "successful initialization",
+			envVars: map[string]string{
+				"AWS_ACCESS_KEY_ID":     "test-key",
+				"AWS_SECRET_ACCESS_KEY": "test-secret",
+				"AWS_S3_BUCKET":         "test-bucket",
+			},
+			wantErr: false,
 		},
 		{
-			name:        "missing token",
-			envToken:    "",
+			name:        "missing AWS credentials",
+			envVars:     map[string]string{},
 			wantErr:     true,
 			errContains: "error loading .env file",
 		},
@@ -62,12 +53,14 @@ func TestNewVideoController(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up environment
-			os.Setenv("DROPBOX_ACCESS_TOKEN", tt.envToken)
-			defer os.Unsetenv("DROPBOX_ACCESS_TOKEN")
+			for k, v := range tt.envVars {
+				os.Setenv(k, v)
+				defer os.Unsetenv(k)
+			}
 
 			// Create a mock environment loader
 			mockEnvLoader := func(filenames ...string) error {
-				if tt.envToken == "" {
+				if len(tt.envVars) == 0 {
 					return fmt.Errorf("error loading .env file")
 				}
 				return nil
@@ -84,7 +77,6 @@ func TestNewVideoController(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.NotNil(t, got)
-			assert.NotNil(t, got.video)
 			assert.Equal(t, testDB, got.db)
 			assert.Equal(t, userService, got.userService)
 			assert.Equal(t, emailService, got.emailService)
@@ -98,8 +90,14 @@ func TestVideoController_UploadVideo(t *testing.T) {
 	defer testDB.Close()
 
 	// Set up test environment variables
-	os.Setenv("DROPBOX_ACCESS_TOKEN", "test_token")
-	defer os.Unsetenv("DROPBOX_ACCESS_TOKEN")
+	os.Setenv("AWS_ACCESS_KEY_ID", "test-key")
+	os.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret")
+	os.Setenv("AWS_S3_BUCKET", "test-bucket")
+	defer func() {
+		os.Unsetenv("AWS_ACCESS_KEY_ID")
+		os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+		os.Unsetenv("AWS_S3_BUCKET")
+	}()
 
 	// Create services
 	userService := services.NewUserService(testDB)
@@ -119,18 +117,14 @@ func TestVideoController_UploadVideo(t *testing.T) {
 		file           []byte
 		filename       string
 		userEmail      string
-		mockUpload     func(file io.Reader, filename string) (string, string, error)
 		expectedStatus int
 		expectedFields []string
 	}{
 		{
-			name:      "successful upload with db verification",
-			file:      []byte("test video content"),
-			filename:  "test.mp4",
-			userEmail: user.Email,
-			mockUpload: func(file io.Reader, filename string) (string, string, error) {
-				return "/test/path", "https://test.com/video.mp4", nil
-			},
+			name:           "successful upload with db verification",
+			file:           []byte("test video content"),
+			filename:       "test.mp4",
+			userEmail:      user.Email,
 			expectedStatus: http.StatusOK,
 			expectedFields: []string{"link", "message", "path", "upload_id"},
 		},
@@ -151,43 +145,28 @@ func TestVideoController_UploadVideo(t *testing.T) {
 			expectedFields: []string{"error"},
 		},
 		{
-			name:      "invalid file type",
-			file:      []byte("test video content"),
-			filename:  "test.txt",
-			userEmail: user.Email,
-			mockUpload: func(file io.Reader, filename string) (string, string, error) {
-				return "", "", fmt.Errorf("Invalid file type")
-			},
+			name:           "invalid file type",
+			file:           []byte("test video content"),
+			filename:       "test.txt",
+			userEmail:      user.Email,
 			expectedStatus: http.StatusBadRequest,
 			expectedFields: []string{"error"},
 		},
 		{
-			name:      "upload failure",
-			file:      []byte("test video content"),
-			filename:  "test.mp4",
-			userEmail: user.Email,
-			mockUpload: func(file io.Reader, filename string) (string, string, error) {
-				return "", "", fmt.Errorf("upload failed")
-			},
-			expectedStatus: http.StatusInternalServerError,
+			name:           "file too large",
+			file:           make([]byte, maxFileSize+1),
+			filename:       "test.mp4",
+			userEmail:      user.Email,
+			expectedStatus: http.StatusBadRequest,
 			expectedFields: []string{"error"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create mock video uploader
-			mockVideo := &MockVideo{
-				uploadFunc: tt.mockUpload,
-			}
-
-			// Create controller with mock
-			vc := &VideoController{
-				video:        mockVideo,
-				db:           testDB,
-				userService:  userService,
-				emailService: emailService,
-			}
+			// Create controller
+			vc, err := NewVideoController(testDB, userService, emailService, func(filenames ...string) error { return nil })
+			assert.NoError(t, err)
 
 			// Setup Gin context
 			w := httptest.NewRecorder()
@@ -199,43 +178,42 @@ func TestVideoController_UploadVideo(t *testing.T) {
 			}
 
 			// Create multipart form
-			body := &bytes.Buffer{}
+			body := new(bytes.Buffer)
 			writer := multipart.NewWriter(body)
-
 			if len(tt.file) > 0 {
 				part, err := writer.CreateFormFile("video", tt.filename)
 				assert.NoError(t, err)
 				_, err = part.Write(tt.file)
 				assert.NoError(t, err)
 			}
-			err = writer.Close()
-			assert.NoError(t, err)
+			writer.Close()
 
-			// Set request
-			c.Request = httptest.NewRequest("POST", "/upload", body)
-			c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+			// Create request
+			req := httptest.NewRequest("POST", "/api/video/upload", body)
+			req.Header.Set("Content-Type", writer.FormDataContentType())
+			c.Request = req
 
-			// Test
+			// Test upload
 			vc.UploadVideo(c)
 
-			// Assert
+			// Check response
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			var response map[string]interface{}
-			err = json.Unmarshal(w.Body.Bytes(), &response)
+			err = json.NewDecoder(w.Body).Decode(&response)
 			assert.NoError(t, err)
 
 			// Check expected fields
 			for _, field := range tt.expectedFields {
-				assert.Contains(t, response, field, "Response should contain field: %s", field)
+				assert.Contains(t, response, field)
 			}
 
-			// If successful upload, verify database
+			// For successful uploads, verify database record
 			if tt.expectedStatus == http.StatusOK {
-				var uploadID int
-				err := testDB.QueryRow("SELECT id FROM video_uploads WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1", user.ID).Scan(&uploadID)
+				var count int
+				err = testDB.QueryRow("SELECT COUNT(*) FROM video_uploads WHERE user_id = $1", user.ID).Scan(&count)
 				assert.NoError(t, err)
-				assert.Equal(t, float64(uploadID), response["upload_id"])
+				assert.Equal(t, 1, count)
 			}
 		})
 	}
@@ -245,10 +223,6 @@ func TestVideoController_GetVideos(t *testing.T) {
 	// Setup
 	testDB := helpers.SetupTestDB(t)
 	defer testDB.Close()
-
-	// Set up test environment variables
-	os.Setenv("DROPBOX_ACCESS_TOKEN", "test_token")
-	defer os.Unsetenv("DROPBOX_ACCESS_TOKEN")
 
 	// Create services
 	userService := services.NewUserService(testDB)
@@ -263,54 +237,44 @@ func TestVideoController_GetVideos(t *testing.T) {
 	err := userService.CreateUser(user)
 	assert.NoError(t, err)
 
-	// Create test video uploads
+	// Insert test video uploads
 	_, err = testDB.Exec(`
-		INSERT INTO video_uploads (user_id, dropbox_url, file_name, status, created_at)
-		VALUES ($1, $2, $3, $4, NOW())
-	`, user.ID, "https://test.com/video1.mp4", "test1.mp4", models.VideoUploadStatusUploaded)
-	assert.NoError(t, err)
-
-	_, err = testDB.Exec(`
-		INSERT INTO video_uploads (user_id, dropbox_url, file_name, status, created_at)
-		VALUES ($1, $2, $3, $4, NOW())
-	`, user.ID, "https://test.com/video2.mp4", "test2.mp4", models.VideoUploadStatusUploaded)
+		INSERT INTO video_uploads (user_id, s3_url, file_name, status)
+		VALUES ($1, $2, $3, $4)
+	`, user.ID, "test/path1.mp4", "test1.mp4", models.VideoUploadStatusUploaded)
 	assert.NoError(t, err)
 
 	tests := []struct {
 		name           string
 		userEmail      string
 		expectedStatus int
-		expectedCount  int
+		expectedFields []string
 	}{
 		{
 			name:           "successful retrieval",
 			userEmail:      user.Email,
 			expectedStatus: http.StatusOK,
-			expectedCount:  2,
+			expectedFields: []string{"videos"},
 		},
 		{
 			name:           "unauthorized",
 			userEmail:      "",
 			expectedStatus: http.StatusUnauthorized,
-			expectedCount:  0,
+			expectedFields: []string{"error"},
 		},
 		{
 			name:           "user not found",
 			userEmail:      "nonexistent@example.com",
 			expectedStatus: http.StatusUnauthorized,
-			expectedCount:  0,
+			expectedFields: []string{"error"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create controller
-			vc := &VideoController{
-				video:        &MockVideo{},
-				db:           testDB,
-				userService:  userService,
-				emailService: emailService,
-			}
+			vc, err := NewVideoController(testDB, userService, emailService, func(filenames ...string) error { return nil })
+			assert.NoError(t, err)
 
 			// Setup Gin context
 			w := httptest.NewRecorder()
@@ -321,20 +285,31 @@ func TestVideoController_GetVideos(t *testing.T) {
 				c.Set("user_email", tt.userEmail)
 			}
 
-			// Test
+			// Test get videos
 			vc.GetVideos(c)
 
-			// Assert
+			// Check response
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
-			if tt.expectedStatus == http.StatusOK {
-				var response map[string]interface{}
-				err := json.Unmarshal(w.Body.Bytes(), &response)
-				assert.NoError(t, err)
+			var response map[string]interface{}
+			err = json.NewDecoder(w.Body).Decode(&response)
+			assert.NoError(t, err)
 
+			// Check expected fields
+			for _, field := range tt.expectedFields {
+				assert.Contains(t, response, field)
+			}
+
+			// For successful retrieval, verify videos array
+			if tt.expectedStatus == http.StatusOK {
 				videos, ok := response["videos"].([]interface{})
 				assert.True(t, ok)
-				assert.Equal(t, tt.expectedCount, len(videos))
+				assert.Equal(t, 1, len(videos))
+
+				video := videos[0].(map[string]interface{})
+				assert.Equal(t, "test1.mp4", video["file_name"])
+				assert.Equal(t, "test/path1.mp4", video["s3_url"])
+				assert.Equal(t, string(models.VideoUploadStatusUploaded), video["status"])
 			}
 		})
 	}

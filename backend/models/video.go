@@ -1,60 +1,108 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"time"
 
-	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox"
-	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox/files"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// StorageClientInterface defines the interface for storage operations
-type StorageClientInterface interface {
-	Upload(arg *files.UploadArg, content io.Reader) (*files.FileMetadata, error)
-	GetTemporaryLink(arg *files.GetTemporaryLinkArg) (*files.GetTemporaryLinkResult, error)
-}
+// UploadVideo uploads a video file to S3 and returns the S3 URL and temporary URL
+func UploadVideo(file io.Reader, filename string) (string, string, error) {
+	// Get AWS credentials from environment
+	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
+	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	bucketName := os.Getenv("AWS_S3_BUCKET")
 
-type Video struct {
-	dbx StorageClientInterface
-}
-
-func NewVideo() (*Video, error) {
-	// Get Dropbox access token from environment
-	accessToken := os.Getenv("DROPBOX_ACCESS_TOKEN")
-	if accessToken == "" {
-		return nil, fmt.Errorf("DROPBOX_ACCESS_TOKEN environment variable is not set")
+	if accessKeyID == "" || secretAccessKey == "" || bucketName == "" {
+		return "", "", fmt.Errorf("AWS credentials or bucket name environment variables are not set")
 	}
 
-	// Initialize Dropbox client
-	config := dropbox.Config{
-		Token: accessToken,
-	}
-	dbx := files.New(config)
-
-	return &Video{
-		dbx: dbx,
-	}, nil
-}
-
-func (v *Video) Upload(file io.Reader, filename string) (string, string, error) {
-	// Upload to Dropbox using streaming
-	dropboxPath := fmt.Sprintf("/videos/%s", filename)
-	arg := files.NewUploadArg(dropboxPath)
-	arg.Mode = &files.WriteMode{Tagged: dropbox.Tagged{Tag: "overwrite"}}
-
-	// Upload the file directly from the reader
-	_, err := v.dbx.Upload(arg, file)
+	// Initialize AWS config
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion("us-east-1"), // Replace with your desired region
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			accessKeyID,
+			secretAccessKey,
+			"",
+		)),
+	)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to upload to Dropbox: %v", err)
+		return "", "", fmt.Errorf("unable to load AWS config: %v", err)
 	}
 
-	// Get a temporary link to the uploaded file
-	arg2 := files.NewGetTemporaryLinkArg(dropboxPath)
-	res, err := v.dbx.GetTemporaryLink(arg2)
+	// Create S3 client
+	client := s3.NewFromConfig(cfg)
+
+	// Generate a unique key for the file
+	key := fmt.Sprintf("videos/%s", filename)
+
+	// Upload to S3
+	_, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+		Body:   file,
+	})
 	if err != nil {
-		return "", "", fmt.Errorf("failed to generate download link: %v", err)
+		return "", "", fmt.Errorf("failed to upload to S3: %v", err)
 	}
 
-	return dropboxPath, res.Link, nil
+	// Generate a presigned URL that expires in 1 hour
+	presignClient := s3.NewPresignClient(client)
+	presignResult, err := presignClient.PresignGetObject(context.TODO(), &s3.GetObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = time.Hour
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate presigned URL: %v", err)
+	}
+
+	return key, presignResult.URL, nil
+}
+
+// DeleteVideo deletes a video from S3
+func DeleteVideo(key string) error {
+	// Get AWS credentials from environment
+	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
+	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	bucketName := os.Getenv("AWS_S3_BUCKET")
+
+	if accessKeyID == "" || secretAccessKey == "" || bucketName == "" {
+		return fmt.Errorf("AWS credentials or bucket name environment variables are not set")
+	}
+
+	// Initialize AWS config
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion("us-east-1"), // Replace with your desired region
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
+			accessKeyID,
+			secretAccessKey,
+			"",
+		)),
+	)
+	if err != nil {
+		return fmt.Errorf("unable to load AWS config: %v", err)
+	}
+
+	// Create S3 client
+	client := s3.NewFromConfig(cfg)
+
+	// Delete from S3
+	_, err = client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete from S3: %v", err)
+	}
+
+	return nil
 }

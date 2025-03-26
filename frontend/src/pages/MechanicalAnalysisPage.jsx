@@ -1,5 +1,6 @@
 import React from 'react';
 import MechanicalAnalysis from '../components/MechanicalAnalysis';
+import AuthRequired from '../components/AuthRequired';
 
 const MechanicalAnalysisPage = () => {
     return (
@@ -8,7 +9,9 @@ const MechanicalAnalysisPage = () => {
                 <h1>Mechanical Analysis</h1>
                 <p>Get a detailed analysis of your pitching mechanics from our expert coaches. Upload your videos below and receive comprehensive feedback to improve your performance.</p>
             </div>
-            <MechanicalAnalysis />
+            <AuthRequired returnTo="/mechanical-analysis">
+                <MechanicalAnalysis />
+            </AuthRequired>
         </div>
     );
 };

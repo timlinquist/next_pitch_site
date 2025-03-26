@@ -3,7 +3,6 @@ package controllers
 import (
 	"database/sql"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -16,14 +15,8 @@ import (
 
 const maxFileSize = 10 * 1024 * 1024 // 10MB in bytes
 
-// VideoUploader defines the interface for video upload operations
-type VideoUploader interface {
-	Upload(file io.Reader, filename string) (string, string, error)
-}
-
 // VideoController handles video-related HTTP requests
 type VideoController struct {
-	video        VideoUploader
 	db           *sql.DB
 	userService  *services.UserService
 	emailService *services.EmailService
@@ -43,14 +36,7 @@ func NewVideoController(db *sql.DB, userService *services.UserService, emailServ
 		return nil, fmt.Errorf("error loading .env file: %v", err)
 	}
 
-	// Initialize video model
-	video, err := models.NewVideo()
-	if err != nil {
-		return nil, fmt.Errorf("error initializing video model: %v", err)
-	}
-
 	return &VideoController{
-		video:        video,
 		db:           db,
 		userService:  userService,
 		emailService: emailService,
@@ -100,22 +86,26 @@ func (c *VideoController) UploadVideo(ctx *gin.Context) {
 	}
 	defer src.Close()
 
-	// Upload the file
-	path, link, err := c.video.Upload(src, file.Filename)
+	// Upload to S3
+	key, link, err := models.UploadVideo(src, file.Filename)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to upload video: %v", err)})
 		return
 	}
 
 	// Create video upload record
 	upload := &models.VideoUpload{
-		UserID:     user.ID,
-		DropboxURL: link,
-		FileName:   file.Filename,
-		Status:     models.VideoUploadStatusUploaded,
+		UserID:   user.ID,
+		S3URL:    key,
+		FileName: file.Filename,
+		Status:   models.VideoUploadStatusUploaded,
 	}
 
 	if err := models.CreateVideoUpload(c.db, upload); err != nil {
+		// If we fail to create the record, try to delete the uploaded file
+		if delErr := models.DeleteVideo(key); delErr != nil {
+			log.Printf("[Video] Failed to delete S3 file after record creation failure: %v", delErr)
+		}
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload record"})
 		return
 	}
@@ -128,7 +118,7 @@ func (c *VideoController) UploadVideo(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":   "Video uploaded successfully",
-		"path":      path,
+		"path":      key,
 		"link":      link,
 		"upload_id": upload.ID,
 	})
@@ -151,7 +141,7 @@ func (c *VideoController) GetVideos(ctx *gin.Context) {
 
 	// Get user's video uploads
 	rows, err := c.db.Query(`
-		SELECT id, dropbox_url, file_name, status, created_at
+		SELECT id, s3_url, file_name, status, created_at
 		FROM video_uploads
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -165,18 +155,18 @@ func (c *VideoController) GetVideos(ctx *gin.Context) {
 	var videos []map[string]interface{}
 	for rows.Next() {
 		var upload models.VideoUpload
-		err := rows.Scan(&upload.ID, &upload.DropboxURL, &upload.FileName, &upload.Status, &upload.CreatedAt)
+		err := rows.Scan(&upload.ID, &upload.S3URL, &upload.FileName, &upload.Status, &upload.CreatedAt)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan video upload"})
 			return
 		}
 
 		videos = append(videos, map[string]interface{}{
-			"id":          upload.ID,
-			"dropbox_url": upload.DropboxURL,
-			"file_name":   upload.FileName,
-			"status":      upload.Status,
-			"created_at":  upload.CreatedAt,
+			"id":         upload.ID,
+			"s3_url":     upload.S3URL,
+			"file_name":  upload.FileName,
+			"status":     upload.Status,
+			"created_at": upload.CreatedAt,
 		})
 	}
 

@@ -66,7 +66,8 @@ describe('Schedule Component', () => {
             isAuthenticated: true,
             user: mockUser,
             loginWithRedirect: vi.fn(),
-            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
+            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token'),
+            isLoading: false
         });
 
         // Setup default Auth0Context mock
@@ -101,17 +102,25 @@ describe('Schedule Component', () => {
         expect(screen.getByTestId('calendar-event')).toBeInTheDocument();
     });
 
-    it('shows login prompt when not authenticated', () => {
+    it('shows login prompt when not authenticated', async () => {
+        // Mock unauthenticated user
         useAuth0.mockReturnValue({
             isAuthenticated: false,
             loginWithRedirect: vi.fn(),
             user: null,
-            getAccessTokenSilently: vi.fn()
+            getAccessTokenSilently: vi.fn(),
+            isLoading: false
         });
 
         renderWithProviders(<Schedule />);
+
+        // Wait for loading to finish
+        await waitFor(() => {
+            expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+        });
+
         expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
-        expect(screen.getByText('Please login or signup to schedule appointments')).toBeInTheDocument();
+        expect(screen.getByText('Please login or signup to continue')).toBeInTheDocument();
     });
 
     it('prevents non-admin users from creating long events', async () => {
@@ -119,7 +128,8 @@ describe('Schedule Component', () => {
         useAuth0.mockReturnValue({
             isAuthenticated: true,
             user: { email: 'test@example.com' },
-            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
+            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token'),
+            isLoading: false
         });
 
         useAuth0Context.mockReturnValue({
@@ -140,7 +150,9 @@ describe('Schedule Component', () => {
         };
 
         // Call the select handler directly
-        window.handleDateSelect(selectInfo);
+        act(() => {
+            window.handleDateSelect(selectInfo);
+        });
 
         // Wait for the error message to appear in an alert
         await waitFor(() => {
@@ -154,7 +166,8 @@ describe('Schedule Component', () => {
         useAuth0.mockReturnValue({
             isAuthenticated: true,
             user: { email: 'test@example.com' },
-            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token')
+            getAccessTokenSilently: vi.fn().mockResolvedValue('mock-token'),
+            isLoading: false
         });
         useAuth0Context.mockReturnValue({ isAdmin: true });
 
