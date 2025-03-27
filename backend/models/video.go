@@ -26,14 +26,19 @@ var DefaultS3ClientFactory S3ClientFactory = func() (S3Client, error) {
 	// Get AWS credentials from environment
 	accessKeyID := os.Getenv("AWS_ACCESS_KEY_ID")
 	secretAccessKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+	region := os.Getenv("AWS_REGION")
 
 	if accessKeyID == "" || secretAccessKey == "" {
 		return nil, fmt.Errorf("AWS credentials or bucket name environment variables are not set")
 	}
 
+	if region == "" {
+		return nil, fmt.Errorf("AWS_REGION environment variable is not set")
+	}
+
 	// Initialize AWS config
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion("us-east-1"), // Replace with your desired region
+		config.WithRegion(region),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
 			accessKeyID,
 			secretAccessKey,

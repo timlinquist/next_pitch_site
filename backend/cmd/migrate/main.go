@@ -19,11 +19,16 @@ func main() {
 	}
 
 	// Parse command line flags
-	action := flag.String("action", "", "Migration action (up/down)")
+	action := flag.String("action", "", "Migration action (up/down/force)")
+	version := flag.Int("version", 0, "Version to force to (required for force action)")
 	flag.Parse()
 
 	if *action == "" {
-		log.Fatal("Please specify an action (up/down)")
+		log.Fatal("Please specify an action (up/down/force)")
+	}
+
+	if *action == "force" && *version == 0 {
+		log.Fatal("Please specify a version number when using force action")
 	}
 
 	// Get database connection details from environment variables
@@ -60,7 +65,12 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Println("Migrations reverted successfully")
+	case "force":
+		if err := m.Force(*version); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Database version forced to %d\n", *version)
 	default:
-		log.Fatal("Invalid action. Use 'up' or 'down'")
+		log.Fatal("Invalid action. Use 'up', 'down', or 'force'")
 	}
 }

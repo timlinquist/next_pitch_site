@@ -102,6 +102,8 @@ func (c *VideoController) UploadVideo(ctx *gin.Context) {
 	}
 
 	if err := models.CreateVideoUpload(c.db, upload); err != nil {
+		log.Printf("[Video] Failed to create upload record: %v", err)
+
 		// If we fail to create the record, try to delete the uploaded file
 		if delErr := models.DeleteVideo(key); delErr != nil {
 			log.Printf("[Video] Failed to delete S3 file after record creation failure: %v", delErr)
