@@ -35,48 +35,124 @@ const MechanicalAnalysis = () => {
             const formData = new FormData();
             formData.append('video', file);
 
-            const response = await fetch(`${config.apiBaseUrl}/video/upload`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData,
-                onUploadProgress: (progressEvent) => {
-                    const progress = (progressEvent.loaded / progressEvent.total) * 100;
-                    if (type === 'front') {
-                        setFrontProgress(progress);
-                    } else {
-                        setSideProgress(progress);
+            // Use XMLHttpRequest to track upload progress
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', (event) => {
+                    if (event.lengthComputable) {
+                        const progress = (event.loaded / event.total) * 100;
+                        if (type === 'front') {
+                            setFrontProgress(progress);
+                        } else {
+                            setSideProgress(progress);
+                        }
                     }
-                }
+                });
+
+                xhr.addEventListener('load', async () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            // Update completion status
+                            if (type === 'front') {
+                                setFrontComplete(true);
+                                setFrontError('');
+                                setFrontProgress(100); // Ensure progress bar is full
+                            } else {
+                                setSideComplete(true);
+                                setSideError('');
+                                setSideProgress(100); // Ensure progress bar is full
+                            }
+                            console.log(`Upload successful: ${result.link}`);
+                            resolve(result);
+                        } catch (error) {
+                            const errorMessage = 'Failed to process server response';
+                            if (type === 'front') {
+                                setFrontError(errorMessage);
+                                setFrontComplete(false);
+                                setFrontProgress(0);
+                            } else {
+                                setSideError(errorMessage);
+                                setSideComplete(false);
+                                setSideProgress(0);
+                            }
+                            reject(new Error(errorMessage));
+                        }
+                    } else {
+                        try {
+                            const error = JSON.parse(xhr.responseText);
+                            const errorMessage = error.error || 'Upload failed';
+                            if (type === 'front') {
+                                setFrontError(errorMessage);
+                                setFrontComplete(false);
+                                setFrontProgress(0);
+                            } else {
+                                setSideError(errorMessage);
+                                setSideComplete(false);
+                                setSideProgress(0);
+                            }
+                            reject(new Error(errorMessage));
+                        } catch (error) {
+                            const errorMessage = 'Upload failed';
+                            if (type === 'front') {
+                                setFrontError(errorMessage);
+                                setFrontComplete(false);
+                                setFrontProgress(0);
+                            } else {
+                                setSideError(errorMessage);
+                                setSideComplete(false);
+                                setSideProgress(0);
+                            }
+                            reject(new Error(errorMessage));
+                        }
+                    }
+                });
+
+                xhr.addEventListener('error', () => {
+                    const errorMessage = 'Network error occurred';
+                    if (type === 'front') {
+                        setFrontError(errorMessage);
+                        setFrontComplete(false);
+                        setFrontProgress(0);
+                    } else {
+                        setSideError(errorMessage);
+                        setSideComplete(false);
+                        setSideProgress(0);
+                    }
+                    reject(new Error(errorMessage));
+                });
+
+                xhr.addEventListener('abort', () => {
+                    const errorMessage = 'Upload was cancelled';
+                    if (type === 'front') {
+                        setFrontError(errorMessage);
+                        setFrontComplete(false);
+                        setFrontProgress(0);
+                    } else {
+                        setSideError(errorMessage);
+                        setSideComplete(false);
+                        setSideProgress(0);
+                    }
+                    reject(new Error(errorMessage));
+                });
+
+                xhr.open('POST', `${config.apiBaseUrl}/video/upload`);
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                xhr.send(formData);
             });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Upload failed');
-            }
-
-            const result = await response.json();
-            
-            // Update completion status
-            if (type === 'front') {
-                setFrontComplete(true);
-                setFrontError('');
-            } else {
-                setSideComplete(true);
-                setSideError('');
-            }
-
-            console.log(`Upload successful: ${result.link}`);
         } catch (error) {
             console.error('Upload error:', error);
             if (type === 'front') {
                 setFrontError(error.message);
                 setFrontComplete(false);
+                setFrontProgress(0);
             } else {
                 setSideError(error.message);
                 setSideComplete(false);
+                setSideProgress(0);
             }
+            throw error;
         }
     };
 

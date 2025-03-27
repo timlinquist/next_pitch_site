@@ -31,6 +31,14 @@ func main() {
 
 	r := gin.Default()
 
+	// Set timeouts for large file uploads
+	r.Use(func(c *gin.Context) {
+		// Set a 30-minute timeout for the entire request
+		c.Request.Header.Set("Connection", "keep-alive")
+		c.Set("timeout", "30m")
+		c.Next()
+	})
+
 	// CORS middleware
 	r.Use(cors.Default())
 
