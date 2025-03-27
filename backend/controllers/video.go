@@ -86,7 +86,33 @@ func (c *VideoController) UploadVideo(ctx *gin.Context) {
 	}
 	defer src.Close()
 
-	// Upload to S3
+	// Create a channel to track upload progress
+	progressChan := make(chan int64, 100)
+	defer close(progressChan)
+
+	// Start a goroutine to send progress updates
+	go func() {
+		total := file.Size
+		var uploaded int64
+		buf := make([]byte, 32*1024) // 32KB buffer
+		for {
+			n, err := src.Read(buf)
+			if n > 0 {
+				uploaded += int64(n)
+				progress := (uploaded * 100) / total
+				select {
+				case progressChan <- progress:
+				default:
+					// Skip if channel is full
+				}
+			}
+			if err != nil {
+				break
+			}
+		}
+	}()
+
+	// Upload to S3 with progress tracking
 	key, link, err := models.UploadVideo(src, file.Filename)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to upload video: %v", err)})
