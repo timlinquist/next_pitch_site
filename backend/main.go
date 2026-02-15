@@ -84,13 +84,19 @@ func main() {
 	// Public routes
 	r.POST("/api/contact", contactController.SendEmail)
 
-	// Serve static files from frontend directory
-	r.Static("/static", "../frontend")
+	// Serve built frontend assets (Vite outputs to frontend/dist/assets/)
+	distPath := filepath.Join("..", "frontend", "dist")
+	r.Static("/assets", filepath.Join(distPath, "assets"))
 
-	// Serve index.html for all routes (React Router will handle the routing)
+	// Serve index.html for all non-API routes (SPA fallback for React Router)
 	r.NoRoute(func(c *gin.Context) {
-		c.File(filepath.Join("..", "frontend", "index.html"))
+		c.File(filepath.Join(distPath, "index.html"))
 	})
 
-	r.Run(":8080") // Run server on port 8080
+	// Use PORT env var (Render sets this automatically), fallback to 8080 for local dev
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	r.Run(":" + port)
 }
