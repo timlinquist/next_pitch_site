@@ -58,12 +58,12 @@ func main() {
 	// Run migration
 	switch *action {
 	case "up":
-		if err := m.Up(); err != nil {
+		if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 			log.Fatal(err)
 		}
 		fmt.Println("Migrations applied successfully")
 	case "down":
-		if err := m.Down(); err != nil {
+		if err := m.Down(); err != nil && err != migrate.ErrNoChange {
 			log.Fatal(err)
 		}
 		fmt.Println("Migrations reverted successfully")
