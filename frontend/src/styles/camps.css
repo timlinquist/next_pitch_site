@@ -1,0 +1,271 @@
+/* Camp spots indicator */
+.camp-spots {
+    font-weight: 600;
+    color: #007bff;
+    margin-bottom: 1rem;
+}
+
+/* Registration form layout */
+.registration-form .form-group input {
+    max-width: 400px;
+}
+
+.camp-info-banner {
+    background-color: #f8f9fa;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.camp-info-banner p {
+    margin: 0.25rem 0;
+}
+
+/* Payment method tabs */
+.payment-method-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.payment-tab {
+    padding: 0.75rem 1.5rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #666;
+    transition: all 0.2s ease;
+}
+
+.payment-tab:hover {
+    color: #333;
+}
+
+.payment-tab.active {
+    color: #007bff;
+    border-bottom-color: #007bff;
+    font-weight: 600;
+}
+
+.payment-tab:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Card element wrapper */
+.card-element-wrapper {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.card-element-wrapper:focus-within {
+    border-color: #007bff;
+}
+
+.payment-content {
+    min-height: 100px;
+}
+
+.paypal-button-wrapper {
+    max-width: 400px;
+}
+
+.payment-error {
+    color: #dc3545;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.payment-note {
+    color: #666;
+    font-style: italic;
+}
+
+.processing-message {
+    color: #007bff;
+    font-weight: 500;
+    margin-top: 1rem;
+}
+
+.register-btn {
+    margin-top: 0.5rem;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+/* Registration success */
+.registration-success {
+    text-align: center;
+}
+
+.registration-success h1 {
+    color: #28a745;
+}
+
+.success-details {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-top: 1.5rem;
+    display: inline-block;
+    text-align: left;
+}
+
+.success-details p {
+    margin: 0.5rem 0;
+}
+
+/* Admin camps page */
+.admin-camp-form {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.admin-camp-form h3 {
+    margin-top: 0;
+}
+
+.admin-camps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.admin-camp-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    background: white;
+}
+
+.admin-camp-item.inactive {
+    opacity: 0.6;
+}
+
+.admin-camp-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.admin-camp-header h3 {
+    margin: 0 0 0.25rem 0;
+}
+
+.admin-camp-header p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.admin-camp-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.btn-small {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+.badge-inactive {
+    background: #6c757d;
+    color: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    margin-left: 0.5rem;
+}
+
+/* Registration panel */
+.registrations-panel {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+}
+
+.registrations-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.registrations-table th,
+.registrations-table td {
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.registrations-table th {
+    font-weight: 600;
+    color: #333;
+    background: #f8f9fa;
+}
+
+.badge-status {
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge-paid {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-failed {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.badge-refunded {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .admin-camp-header {
+        flex-direction: column;
+    }
+
+    .admin-camp-actions {
+        flex-wrap: wrap;
+    }
+
+    .registrations-table {
+        font-size: 0.8rem;
+    }
+
+    .registrations-table th,
+    .registrations-table td {
+        padding: 0.35rem 0.5rem;
+    }
+
+    .payment-method-tabs {
+        flex-direction: column;
+        border-bottom: none;
+    }
+
+    .payment-tab {
+        border-bottom: 2px solid #e0e0e0;
+    }
+}

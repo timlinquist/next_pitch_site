@@ -1,0 +1,13 @@
+<h2>New Camp Registration</h2>
+<p>A new registration has been received:</p>
+<ul>
+    <li><strong>Camp:</strong> {{.Camp.Name}}</li>
+    <li><strong>Dates:</strong> {{.Camp.StartDate.Format "January 2, 2006"}} - {{.Camp.EndDate.Format "January 2, 2006"}}</li>
+    <li><strong>Athlete:</strong> {{.Athlete.Name}}</li>
+    <li><strong>Age:</strong> {{.Athlete.Age}}</li>
+    <li><strong>Years Played:</strong> {{.Athlete.YearsPlayed}}</li>
+    <li><strong>Position:</strong> {{.Athlete.Position}}</li>
+    <li><strong>Parent Email:</strong> {{.Athlete.ParentEmail}}</li>
+    <li><strong>Parent Phone:</strong> {{.Athlete.ParentPhone}}</li>
+    <li><strong>Amount Paid:</strong> {{.Amount}}</li>
+</ul>

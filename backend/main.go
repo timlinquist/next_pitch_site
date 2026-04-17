@@ -46,11 +46,15 @@ func main() {
 	userService := services.NewUserService(db.DB)
 	scheduleService := services.NewScheduleService(db.DB)
 	emailService := services.NewEmailService()
+	campService := services.NewCampService(db.DB)
+	registrationService := services.NewRegistrationService(db.DB, campService)
 
 	// Initialize handlers and controllers
 	scheduleHandler := handlers.NewScheduleHandler(scheduleService, userService, emailService)
 	contactController := controllers.NewContactController(emailService)
 	userController := controllers.NewUserController(userService)
+	campController := controllers.NewCampController(campService, userService)
+	registrationController := controllers.NewRegistrationController(registrationService, campService, emailService, userService)
 
 	videoController, err := controllers.NewVideoController(db.DB, userService, emailService)
 	if err != nil {
@@ -79,10 +83,26 @@ func main() {
 
 		// Video upload route
 		protected.POST("/video/upload", videoController.UploadVideo)
+
+		// Admin camp routes
+		protected.POST("/camps", campController.CreateCamp)
+		protected.PUT("/camps/:id", campController.UpdateCamp)
+		protected.DELETE("/camps/:id", campController.DeactivateCamp)
+		protected.GET("/camps/:id/registrations", registrationController.GetCampRegistrations)
 	}
 
 	// Public routes
 	r.POST("/api/contact", contactController.SendEmail)
+
+	// Public camp routes
+	r.GET("/api/camps", campController.GetActiveCamps)
+	r.GET("/api/camps/:id", campController.GetCampByID)
+
+	// Public registration + payment routes
+	r.POST("/api/register", registrationController.RegisterForCamp)
+	r.POST("/api/register/stripe-confirm", registrationController.ConfirmStripePayment)
+	r.POST("/api/register/paypal-capture", registrationController.CapturePayPalPayment)
+	r.POST("/api/webhooks/stripe", registrationController.HandleStripeWebhook)
 
 	// Serve static files from frontend directory
 	r.Static("/static", "../frontend")

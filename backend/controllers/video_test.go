@@ -63,6 +63,12 @@ func (m *mockEmailService) SendAppointmentConfirmationEmail(entry *models.Schedu
 	return nil
 }
 
+func (m *mockEmailService) SendCampRegistrationConfirmation(reg *models.CampRegistration, athlete *models.Athlete, camp *models.Camp) {
+}
+
+func (m *mockEmailService) SendAdminCampRegistrationNotification(reg *models.CampRegistration, athlete *models.Athlete, camp *models.Camp) {
+}
+
 func (m *mockEmailService) QueueEmail(data services.EmailData) {
 	// Do nothing
 }

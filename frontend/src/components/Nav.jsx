@@ -20,6 +20,7 @@ const Nav = () => {
                     <Link to="/" className={`nav-link ${isActive('/')}`}>Home</Link>
                     <Link to="/about" className={`nav-link ${isActive('/about')}`}>About</Link>
                     <Link to="/services" className={`nav-link ${isActive('/services')}`}>Services</Link>
+                    <Link to="/camps" className={`nav-link ${isActive('/camps')}`}>Camps</Link>
                     <Link to="/schedule" className={`nav-link ${isActive('/schedule')}`}>Schedule</Link>
                     <Link to="/contact" className={`nav-link ${isActive('/contact')}`}>Contact</Link>
                     {isAuthenticated ? (
