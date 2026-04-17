@@ -107,5 +107,10 @@ func main() {
 		c.File(filepath.Join(distPath, "index.html"))
 	})
 
-	r.Run(":8080") // Run server on port 8080
+	// Use PORT env var (Render sets this automatically), fallback to 8080 for local dev
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	r.Run(":" + port)
 }
