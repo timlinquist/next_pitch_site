@@ -7,6 +7,8 @@
 
 ## Git
 
+**Before any `git push`**, always run `/credential-scan` first. Do not push if the scan finds issues.
+
 The remote origin uses a custom SSH alias (`git@github-personal:`) which may not resolve depending on local SSH config. When pushing fails over SSH, use the gh CLI HTTPS workaround:
 
 ```sh
