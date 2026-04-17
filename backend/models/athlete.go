@@ -11,7 +11,7 @@ type Athlete struct {
 	YearsPlayed int       `json:"years_played"`
 	Position    string    `json:"position"`
 	UserID      *int      `json:"user_id"`
-	ParentEmail string    `json:"parent_email" binding:"required"`
+	ParentEmail string    `json:"parent_email"`
 	ParentPhone string    `json:"parent_phone"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
