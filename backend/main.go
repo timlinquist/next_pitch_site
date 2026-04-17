@@ -84,12 +84,27 @@ func main() {
 	// Public routes
 	r.POST("/api/contact", contactController.SendEmail)
 
-	// Serve static files from frontend directory
-	r.Static("/static", "../frontend")
+	// Serve static files from frontend build directory, with SPA fallback
+	distPath := filepath.Join("..", "frontend", "dist")
+	r.Use(func(c *gin.Context) {
+		// Skip API routes
+		if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
+			c.Next()
+			return
+		}
+		// Try to serve a static file from dist
+		filePath := filepath.Join(distPath, c.Request.URL.Path)
+		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
+			c.File(filePath)
+			c.Abort()
+			return
+		}
+		c.Next()
+	})
 
-	// Serve index.html for all routes (React Router will handle the routing)
+	// SPA fallback: serve index.html for all unmatched routes
 	r.NoRoute(func(c *gin.Context) {
-		c.File(filepath.Join("..", "frontend", "index.html"))
+		c.File(filepath.Join(distPath, "index.html"))
 	})
 
 	r.Run(":8080") // Run server on port 8080
