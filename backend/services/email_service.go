@@ -106,8 +106,8 @@ func NewEmailService() *EmailService {
 		"admin_camp_registration":   "admin_camp_registration.html",
 	}
 
-	// Set template directory path
-	templateDir := filepath.Join("..", "backend", "templates", "email")
+	// Set template directory path (relative to working directory, which is backend/)
+	templateDir := filepath.Join("templates", "email")
 	log.Printf("[Email] Loading templates from: %s", templateDir)
 
 	// List contents of template directory

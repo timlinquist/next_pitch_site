@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"nextpitch.com/backend/models"
 	"nextpitch.com/backend/services"
 )
@@ -22,20 +21,8 @@ type VideoController struct {
 	emailService services.EmailServiceInterface
 }
 
-// EnvLoader is a function type for loading environment variables
-type EnvLoader func(filenames ...string) error
-
 // NewVideoController creates a new video controller
-func NewVideoController(db *sql.DB, userService *services.UserService, emailService services.EmailServiceInterface, envLoader ...EnvLoader) (*VideoController, error) {
-	// Load environment variables
-	loader := godotenv.Load
-	if len(envLoader) > 0 {
-		loader = envLoader[0]
-	}
-	if err := loader(); err != nil {
-		return nil, fmt.Errorf("error loading .env file: %v", err)
-	}
-
+func NewVideoController(db *sql.DB, userService *services.UserService, emailService services.EmailServiceInterface) (*VideoController, error) {
 	return &VideoController{
 		db:           db,
 		userService:  userService,

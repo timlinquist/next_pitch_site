@@ -1,7 +1,20 @@
-# Environment files
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build output
+frontend/dist/
+
+# Environment files (contain secrets)
 .env
 .env.*
 !.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
 
 # OS files
 .DS_Store
@@ -9,3 +22,5 @@
 # IDE
 .idea
 .vscode
+*.swp
+*.swo
