@@ -25,13 +25,18 @@ export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && <command>
 
 ## Development
 
-Local dev uses the Vite dev server (HMR + API proxy to Go backend):
+To start the full local dev environment (runs migrations, then backend + frontend):
 
-1. `cd backend && go run .` — starts API on :8080
-2. `cd frontend && npm run dev` — starts Vite on :5173, proxies `/api` to :8080
-3. Open `localhost:5173`
+```sh
+make dev:start
+```
+
+This runs migrations, starts the Go API on :8080, and Vite on :5173 (proxies `/api` to backend). Open `localhost:5173`. Ctrl-C stops both.
+
+Other useful targets:
+- `make migrate` — run DB migrations only
+- `make test` — run backend + frontend tests
+- `make test-backend` / `make test-frontend` — run tests individually
+- `make build` — production build (backend binary + frontend dist)
 
 `npm run build` is for production only (output to `frontend/dist/`, served by Go).
-
-- Run backend tests: `cd backend && go test ./...`
-- Run frontend tests: `cd frontend && npm run test`
