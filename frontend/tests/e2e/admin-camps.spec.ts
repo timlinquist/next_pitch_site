@@ -1,24 +1,61 @@
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { authStoragePath } from './helpers/auth';
+import { seedTestCamp, seedTestRegistration, type TestCamp } from './helpers/db';
 
-// Admin tests require Auth0 login. Options to discuss:
-//   1. Drive Auth0 Universal Login page (brittle, depends on Auth0 markup)
-//   2. Inject a valid JWT into localStorage (reliable but needs token crafting)
-//   3. Use Auth0 Resource Owner Password Grant for headless login
-//   4. Log in once manually, seed is_admin via DB, reuse session storage
+test.use({ storageState: authStoragePath });
 
-test.skip('admin creates a camp', async ({ page }) => {
-  // TODO: Implement after auth strategy is decided
-  // - Log in as admin (Auth0)
-  // - Navigate to /admin/camps
-  // - Fill camp form, submit
-  // - Assert camp appears in admin list
-  // - Assert camp appears on public /camps
+test('admin creates a camp', async ({ page }) => {
+  await page.goto('/admin/camps');
+
+  // Should see admin page, not "Access Denied"
+  await expect(page.getByRole('heading', { name: 'Manage Camps' })).toBeVisible({ timeout: 15_000 });
+
+  // Open create form
+  await page.getByRole('button', { name: 'Create New Camp' }).click();
+  await expect(page.getByRole('heading', { name: 'New Camp' })).toBeVisible();
+
+  // Fill camp form
+  await page.locator('#camp-name').fill('E2E Test Admin Camp');
+  await page.locator('#camp-desc').fill('Created by admin E2E test');
+  await page.locator('#camp-start').fill('2026-08-01');
+  await page.locator('#camp-end').fill('2026-08-03');
+  await page.locator('#camp-price').fill('7500');
+  await page.locator('#camp-cap').fill('15');
+
+  // Submit
+  await page.getByRole('button', { name: 'Create' }).click();
+
+  // Assert camp appears in admin list
+  await expect(page.locator('.admin-camp-item', { hasText: 'E2E Test Admin Camp' })).toBeVisible({ timeout: 10_000 });
+
+  // Verify it appears on public camps page too
+  await page.goto('/camps');
+  await expect(page.locator('.service-card', { hasText: 'E2E Test Admin Camp' })).toBeVisible();
 });
 
-test.skip('admin views registrations', async ({ page }) => {
-  // TODO: Implement after auth strategy is decided
-  // - Log in as admin
-  // - Navigate to /admin/camps
-  // - Click "Registrations" on a camp with registrations
-  // - Assert table shows athlete name, parent email, payment status
+test('admin views registrations', async ({ page }) => {
+  // Seed a camp with a registration
+  const camp = await seedTestCamp({
+    name: 'E2E Test Reg View Camp',
+    price_cents: 5000,
+  });
+  await seedTestRegistration(camp.id, {
+    athleteName: 'E2E Test Viewable Athlete',
+    parentEmail: 'e2e-view@example.com',
+    paymentStatus: 'paid',
+  });
+
+  await page.goto('/admin/camps');
+  await expect(page.getByRole('heading', { name: 'Manage Camps' })).toBeVisible({ timeout: 15_000 });
+
+  // Find the camp and expand registrations
+  const campItem = page.locator('.admin-camp-item', { hasText: camp.name });
+  await campItem.getByRole('button', { name: 'Registrations' }).click();
+
+  // Assert registration table is visible with expected data
+  const table = campItem.locator('.registrations-table');
+  await expect(table).toBeVisible({ timeout: 10_000 });
+  await expect(table).toContainText('E2E Test Viewable Athlete');
+  await expect(table).toContainText('e2e-view@example.com');
+  await expect(table).toContainText('paid');
 });

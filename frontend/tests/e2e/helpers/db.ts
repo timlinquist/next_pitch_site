@@ -85,6 +85,47 @@ export async function cleanupTestData() {
   );
 }
 
+export async function getUser(email: string) {
+  const result = await db().query(
+    `SELECT id, email, name, is_admin FROM users WHERE email = $1`,
+    [email]
+  );
+  return result.rows[0] || null;
+}
+
+export async function promoteToAdmin(email: string) {
+  await db().query(
+    `UPDATE users SET is_admin = true WHERE email = $1`,
+    [email]
+  );
+}
+
+export async function seedTestRegistration(campId: number, overrides: Partial<{
+  athleteName: string;
+  parentEmail: string;
+  paymentStatus: string;
+}> = {}) {
+  const athleteName = overrides.athleteName || `${TEST_PREFIX} Registered Athlete`;
+  const parentEmail = overrides.parentEmail || 'e2e-parent@example.com';
+  const paymentStatus = overrides.paymentStatus || 'paid';
+
+  const athleteResult = await db().query(
+    `INSERT INTO athletes (name, age, years_played, position, parent_email, parent_phone)
+     VALUES ($1, 10, 2, 'Catcher', $2, '555-0100')
+     RETURNING id`,
+    [athleteName, parentEmail]
+  );
+  const athleteId = athleteResult.rows[0].id;
+
+  const regResult = await db().query(
+    `INSERT INTO camp_registrations (athlete_id, camp_id, payment_status, payment_method, amount_cents, parent_email)
+     VALUES ($1, $2, $3, 'stripe', 5000, $4)
+     RETURNING id`,
+    [athleteId, campId, paymentStatus, parentEmail]
+  );
+  return regResult.rows[0];
+}
+
 export async function closeDb() {
   if (pool) {
     await pool.end();

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"nextpitch.com/backend/models"
 	"nextpitch.com/backend/services"
 )
 
@@ -27,10 +28,19 @@ func (c *UserController) GetCurrentUser(ctx *gin.Context) {
 		return
 	}
 
-	log.Printf("[User] Getting user for email: %v", userEmail)
-	// Get user from service
-	user, err := c.userService.GetUserByEmail(userEmail.(string))
-	if err != nil {
+	email := userEmail.(string)
+	log.Printf("[User] Getting user for email: %v", email)
+
+	user, err := c.userService.GetUserByEmail(email)
+	if err != nil && err.Error() == "user not found" {
+		user = &models.User{Email: email, Name: "", IsAdmin: false}
+		if createErr := c.userService.CreateUser(user); createErr != nil {
+			log.Printf("[User] Error creating user: %v", createErr)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+			return
+		}
+		log.Printf("[User] Created new user for email: %s", email)
+	} else if err != nil {
 		log.Printf("[User] Error fetching user: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch user"})
 		return
