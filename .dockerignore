@@ -1,0 +1,21 @@
+.git
+.DS_Store
+.cursor
+*.md
+
+# Don't send node_modules or dist to Docker (we rebuild inside)
+frontend/node_modules
+frontend/dist
+
+# Don't send env files (secrets come from Render env vars)
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+
+# Test files
+backend/test
+frontend/src/test
+src/

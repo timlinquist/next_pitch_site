@@ -60,11 +60,11 @@ const Contact = () => {
                         <h2>Get in Touch</h2>
                         <div className="info-item">
                             <h3>Address</h3>
-                            <p>123 Pitch Street, Suite 100<br />San Francisco, CA 94105</p>
+                            <p>10311 NE 198th St<br />Battle Ground, WA 98604</p>
                         </div>
                         <div className="info-item">
                             <h3>Phone</h3>
-                            <p>(555) 123-4567</p>
+                            <p>(971) 266-3377</p>
                         </div>
                         <div className="info-item">
                             <h3>Email</h3>
@@ -72,7 +72,8 @@ const Contact = () => {
                         </div>
                         <div className="info-item">
                             <h3>Hours</h3>
-                            <p>Monday - Friday<br />9:00 AM - 6:00 PM PST</p>
+                            <p>Monday - Friday<br />5:00 PM - 10:00 PM PST</p>
+                            <p>Saturday - Sunday<br />8:00 AM - 8:00 PM PST</p>
                         </div>
                     </div>
 

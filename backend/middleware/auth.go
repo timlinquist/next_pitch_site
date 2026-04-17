@@ -23,12 +23,15 @@ func (c CustomClaims) Validate(ctx context.Context) error {
 }
 
 func AuthMiddleware() gin.HandlerFunc {
-	issuerURL := fmt.Sprintf("https://%s/", os.Getenv("AUTH0_DOMAIN"))
+	auth0Domain := os.Getenv("AUTH0_DOMAIN")
+	if auth0Domain == "" {
+		panic("AUTH0_DOMAIN environment variable is required")
+	}
+	issuerURL := fmt.Sprintf("https://%s/", auth0Domain)
 	log.Printf("[Auth] Starting middleware with issuer URL: %s", issuerURL)
 
 	// Parse the Auth0 domain URL for the JWKS provider
-	auth0Domain := "dev-cx0z71mw7lq3og41.us.auth0.com"
-	issuerURLParsed, err := url.Parse(fmt.Sprintf("https://%s/", auth0Domain))
+	issuerURLParsed, err := url.Parse(issuerURL)
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +42,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	jwtValidator, err := validator.New(
 		provider.KeyFunc,
 		validator.RS256,
-		fmt.Sprintf("https://%s/", auth0Domain),
+		issuerURL,
 		[]string{"https://thenextpitch.org"},
 		validator.WithCustomClaims(
 			func() validator.CustomClaims {
