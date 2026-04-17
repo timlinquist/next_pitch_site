@@ -29,7 +29,7 @@ test('Register Now navigates to registration form', async ({ page }) => {
   const card = page.locator('.service-card', { hasText: camp.name });
   await card.getByRole('link', { name: 'Register Now' }).click();
 
-  await expect(page).toHaveURL(new RegExp(`/camps/${camp.id}/register`));
+  await expect(page).toHaveURL(new RegExp(`/camps/${camp.slug}/register`));
   await expect(page.getByRole('heading', { name: `Register for ${camp.name}` })).toBeVisible();
   await expect(page.locator('.camp-info-banner')).toContainText('$150.00');
 });

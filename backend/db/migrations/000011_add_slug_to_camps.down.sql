@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS idx_camps_slug;
+ALTER TABLE camps DROP COLUMN IF EXISTS slug;

@@ -96,6 +96,7 @@ func main() {
 
 	// Public camp routes
 	r.GET("/api/camps", campController.GetActiveCamps)
+	r.GET("/api/camps/by-slug/:slug", campController.GetCampBySlug)
 	r.GET("/api/camps/:id", campController.GetCampByID)
 
 	// Public registration + payment routes

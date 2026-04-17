@@ -59,7 +59,7 @@ function App() {
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/camps" element={<CampsPage />} />
-        <Route path="/camps/:campId/register" element={<CampRegistrationPage />} />
+        <Route path="/camps/:slug/register" element={<CampRegistrationPage />} />
         <Route path="/admin/camps" element={
           <ProtectedRoute>
             <AdminCampsPage />

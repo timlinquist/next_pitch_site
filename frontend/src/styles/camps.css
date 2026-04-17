@@ -241,6 +241,84 @@
     color: #0c5460;
 }
 
+/* Slug field */
+.slug-field input {
+    font-family: monospace;
+    color: #555;
+}
+
+.camp-slug {
+    font-family: monospace;
+    font-size: 0.8rem;
+    color: #666;
+    font-weight: normal;
+    margin-left: 0.5rem;
+}
+
+/* Capacity mode toggle */
+.capacity-mode-toggle label:first-child {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.capacity-mode-options {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.capacity-mode-options label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+/* Age group editor */
+.age-group-editor {
+    margin-bottom: 1rem;
+}
+
+.age-group-editor > label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.age-group-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.age-group-row input {
+    width: 100px;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+/* Age group spots display */
+.age-group-spots p {
+    margin: 0.15rem 0;
+    font-size: 0.9rem;
+}
+
+/* Age eligibility feedback */
+.age-group-eligible {
+    color: #28a745;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.age-group-ineligible {
+    color: #dc3545;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .admin-camp-header {

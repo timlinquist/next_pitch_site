@@ -30,6 +30,7 @@ export interface TestCamp {
   id: number;
   name: string;
   price_cents: number;
+  slug: string;
 }
 
 export async function seedTestCamp(overrides: Partial<{
@@ -39,6 +40,7 @@ export async function seedTestCamp(overrides: Partial<{
   end_date: string;
   price_cents: number;
   max_capacity: number | null;
+  slug: string;
 }> = {}): Promise<TestCamp> {
   const name = overrides.name || `${TEST_PREFIX} Camp ${Date.now()}`;
   const description = overrides.description || 'Automated test camp';
@@ -46,15 +48,26 @@ export async function seedTestCamp(overrides: Partial<{
   const endDate = overrides.end_date || '2026-07-03';
   const priceCents = overrides.price_cents ?? 5000;
   const maxCapacity = overrides.max_capacity ?? 20;
+  const slug = overrides.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
   const result = await db().query(
-    `INSERT INTO camps (name, description, start_date, end_date, price_cents, max_capacity, is_active)
-     VALUES ($1, $2, $3, $4, $5, $6, true)
-     RETURNING id, name, price_cents`,
-    [name, description, startDate, endDate, priceCents, maxCapacity]
+    `INSERT INTO camps (name, description, start_date, end_date, price_cents, max_capacity, slug, is_active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+     RETURNING id, name, price_cents, slug`,
+    [name, description, startDate, endDate, priceCents, maxCapacity, slug]
   );
 
   return result.rows[0];
+}
+
+export async function seedTestCampAgeGroups(campId: number, groups: { min_age: number; max_age: number; max_capacity: number }[]) {
+  for (const g of groups) {
+    await db().query(
+      `INSERT INTO camp_age_groups (camp_id, min_age, max_age, max_capacity)
+       VALUES ($1, $2, $3, $4)`,
+      [campId, g.min_age, g.max_age, g.max_capacity]
+    );
+  }
 }
 
 export async function getRegistration(campId: number) {
@@ -73,6 +86,10 @@ export async function getRegistration(campId: number) {
 export async function cleanupTestData() {
   await db().query(
     `DELETE FROM camp_registrations WHERE camp_id IN (SELECT id FROM camps WHERE name LIKE $1)`,
+    [`${TEST_PREFIX}%`]
+  );
+  await db().query(
+    `DELETE FROM camp_age_groups WHERE camp_id IN (SELECT id FROM camps WHERE name LIKE $1)`,
     [`${TEST_PREFIX}%`]
   );
   await db().query(

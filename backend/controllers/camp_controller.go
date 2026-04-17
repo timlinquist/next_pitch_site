@@ -21,6 +21,41 @@ func NewCampController(campService *services.CampService, userService *services.
 	}
 }
 
+type AgeGroupWithSpots struct {
+	models.CampAgeGroup
+	RegisteredCount int `json:"registered_count"`
+	SpotsRemaining  int `json:"spots_remaining"`
+}
+
+type CampWithSpots struct {
+	models.Camp
+	RegisteredCount int                `json:"registered_count"`
+	SpotsRemaining  *int              `json:"spots_remaining"`
+	AgeGroups       []AgeGroupWithSpots `json:"age_groups,omitempty"`
+}
+
+func (ctrl *CampController) buildCampWithSpots(camp models.Camp) CampWithSpots {
+	count, _ := ctrl.campService.GetCampRegistrationCount(camp.ID)
+	cws := CampWithSpots{Camp: camp, RegisteredCount: count}
+
+	ageGroups, _ := ctrl.campService.GetAgeGroupsByCampID(camp.ID)
+	if len(ageGroups) > 0 {
+		for _, g := range ageGroups {
+			agCount, _ := ctrl.campService.GetAgeGroupRegistrationCount(camp.ID, g.MinAge, g.MaxAge)
+			cws.AgeGroups = append(cws.AgeGroups, AgeGroupWithSpots{
+				CampAgeGroup:    g,
+				RegisteredCount: agCount,
+				SpotsRemaining:  g.MaxCapacity - agCount,
+			})
+		}
+	} else if camp.MaxCapacity != nil {
+		remaining := *camp.MaxCapacity - count
+		cws.SpotsRemaining = &remaining
+	}
+
+	return cws
+}
+
 func (ctrl *CampController) GetActiveCamps(c *gin.Context) {
 	camps, err := ctrl.campService.GetActiveCamps()
 	if err != nil {
@@ -28,25 +63,9 @@ func (ctrl *CampController) GetActiveCamps(c *gin.Context) {
 		return
 	}
 
-	// Include registration count for each camp
-	type CampWithSpots struct {
-		models.Camp
-		RegisteredCount int  `json:"registered_count"`
-		SpotsRemaining  *int `json:"spots_remaining"`
-	}
-
 	var result []CampWithSpots
 	for _, camp := range camps {
-		count, err := ctrl.campService.GetCampRegistrationCount(camp.ID)
-		if err != nil {
-			count = 0
-		}
-		cws := CampWithSpots{Camp: camp, RegisteredCount: count}
-		if camp.MaxCapacity != nil {
-			remaining := *camp.MaxCapacity - count
-			cws.SpotsRemaining = &remaining
-		}
-		result = append(result, cws)
+		result = append(result, ctrl.buildCampWithSpots(camp))
 	}
 
 	c.JSON(http.StatusOK, result)
@@ -65,21 +84,24 @@ func (ctrl *CampController) GetCampByID(c *gin.Context) {
 		return
 	}
 
-	count, _ := ctrl.campService.GetCampRegistrationCount(camp.ID)
+	c.JSON(http.StatusOK, ctrl.buildCampWithSpots(*camp))
+}
 
-	type CampWithSpots struct {
-		models.Camp
-		RegisteredCount int  `json:"registered_count"`
-		SpotsRemaining  *int `json:"spots_remaining"`
+func (ctrl *CampController) GetCampBySlug(c *gin.Context) {
+	slug := c.Param("slug")
+
+	camp, err := ctrl.campService.GetCampBySlug(slug)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "camp not found"})
+		return
 	}
 
-	result := CampWithSpots{Camp: *camp, RegisteredCount: count}
-	if camp.MaxCapacity != nil {
-		remaining := *camp.MaxCapacity - count
-		result.SpotsRemaining = &remaining
-	}
+	c.JSON(http.StatusOK, ctrl.buildCampWithSpots(*camp))
+}
 
-	c.JSON(http.StatusOK, result)
+type createCampRequest struct {
+	models.Camp
+	AgeGroups []models.CampAgeGroup `json:"age_groups"`
 }
 
 func (ctrl *CampController) CreateCamp(c *gin.Context) {
@@ -95,18 +117,38 @@ func (ctrl *CampController) CreateCamp(c *gin.Context) {
 		return
 	}
 
-	var camp models.Camp
-	if err := c.ShouldBindJSON(&camp); err != nil {
+	var req createCampRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data: " + err.Error()})
 		return
 	}
 
-	if err := ctrl.campService.CreateCamp(&camp); err != nil {
+	if len(req.AgeGroups) > 0 && req.Camp.MaxCapacity != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot set both max_capacity and age_groups"})
+		return
+	}
+
+	if len(req.AgeGroups) > 0 {
+		if err := ctrl.campService.ValidateAgeGroups(req.AgeGroups); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		req.Camp.MaxCapacity = nil
+	}
+
+	if err := ctrl.campService.CreateCamp(&req.Camp); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create camp: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, camp)
+	if len(req.AgeGroups) > 0 {
+		if err := ctrl.campService.SetAgeGroups(req.Camp.ID, req.AgeGroups); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set age groups: " + err.Error()})
+			return
+		}
+	}
+
+	c.JSON(http.StatusCreated, ctrl.buildCampWithSpots(req.Camp))
 }
 
 func (ctrl *CampController) UpdateCamp(c *gin.Context) {
@@ -128,19 +170,37 @@ func (ctrl *CampController) UpdateCamp(c *gin.Context) {
 		return
 	}
 
-	var camp models.Camp
-	if err := c.ShouldBindJSON(&camp); err != nil {
+	var req createCampRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data: " + err.Error()})
 		return
 	}
-	camp.ID = id
+	req.Camp.ID = id
 
-	if err := ctrl.campService.UpdateCamp(&camp); err != nil {
+	if len(req.AgeGroups) > 0 && req.Camp.MaxCapacity != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot set both max_capacity and age_groups"})
+		return
+	}
+
+	if len(req.AgeGroups) > 0 {
+		if err := ctrl.campService.ValidateAgeGroups(req.AgeGroups); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		req.Camp.MaxCapacity = nil
+	}
+
+	if err := ctrl.campService.UpdateCamp(&req.Camp); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update camp: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, camp)
+	if err := ctrl.campService.SetAgeGroups(req.Camp.ID, req.AgeGroups); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set age groups: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, ctrl.buildCampWithSpots(req.Camp))
 }
 
 func (ctrl *CampController) DeactivateCamp(c *gin.Context) {

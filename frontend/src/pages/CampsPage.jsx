@@ -39,6 +39,13 @@ const CampsPage = () => {
         return `$${(cents / 100).toFixed(2)}`;
     };
 
+    const isCampFull = (camp) => {
+        if (camp.age_groups && camp.age_groups.length > 0) {
+            return camp.age_groups.every(g => g.spots_remaining <= 0);
+        }
+        return camp.spots_remaining === 0;
+    };
+
     if (loading) {
         return (
             <div className="container">
@@ -82,17 +89,27 @@ const CampsPage = () => {
                                 {formatDate(camp.start_date)} - {formatDate(camp.end_date)}
                             </p>
                             <p className="description">{camp.description}</p>
-                            {camp.spots_remaining !== null && camp.spots_remaining !== undefined && (
+                            {camp.age_groups && camp.age_groups.length > 0 ? (
+                                <div className="age-group-spots">
+                                    {camp.age_groups.map((g, i) => (
+                                        <p key={i} className="camp-spots">
+                                            Ages {g.min_age}-{g.max_age}: {g.spots_remaining > 0
+                                                ? `${g.spots_remaining} spot${g.spots_remaining !== 1 ? 's' : ''} remaining`
+                                                : 'Full'}
+                                        </p>
+                                    ))}
+                                </div>
+                            ) : camp.spots_remaining !== null && camp.spots_remaining !== undefined && (
                                 <p className="camp-spots">
                                     {camp.spots_remaining > 0
                                         ? `${camp.spots_remaining} spot${camp.spots_remaining !== 1 ? 's' : ''} remaining`
                                         : 'Full'}
                                 </p>
                             )}
-                            {camp.spots_remaining === 0 ? (
+                            {isCampFull(camp) ? (
                                 <button className="btn" disabled>Full</button>
                             ) : (
-                                <Link to={`/camps/${camp.id}/register`} className="btn">
+                                <Link to={`/camps/${camp.slug}/register`} className="btn">
                                     Register Now
                                 </Link>
                             )}

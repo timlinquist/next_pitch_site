@@ -97,7 +97,7 @@ const StripeCheckoutForm = ({ camp, athleteData, onSuccess, onError, setProcessi
 };
 
 const CampRegistrationPage = () => {
-    const { campId } = useParams();
+    const { slug } = useParams();
     const [camp, setCamp] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -120,7 +120,7 @@ const CampRegistrationPage = () => {
     useEffect(() => {
         const fetchCamp = async () => {
             try {
-                const response = await fetch(getApiUrl(`camps/${campId}`));
+                const response = await fetch(getApiUrl(`camps/by-slug/${slug}`));
                 if (!response.ok) throw new Error('Camp not found');
                 const data = await response.json();
                 setCamp(data);
@@ -132,7 +132,7 @@ const CampRegistrationPage = () => {
         };
 
         fetchCamp();
-    }, [campId]);
+    }, [slug]);
 
     const handleChange = (e) => {
         setAthleteData({ ...athleteData, [e.target.name]: e.target.value });
@@ -140,6 +140,24 @@ const CampRegistrationPage = () => {
 
     const isFormValid = () => {
         return athleteData.name && athleteData.age && athleteData.parentEmail;
+    };
+
+    const getAgeGroupFeedback = () => {
+        if (!camp?.age_groups?.length || !athleteData.age) return null;
+        const age = parseInt(athleteData.age);
+        if (isNaN(age)) return null;
+
+        const matched = camp.age_groups.find(g => age >= g.min_age && age <= g.max_age);
+        if (!matched) {
+            return { eligible: false, message: 'This age is not eligible for this camp' };
+        }
+        if (matched.spots_remaining <= 0) {
+            return { eligible: false, message: `Ages ${matched.min_age}-${matched.max_age} group is full` };
+        }
+        return {
+            eligible: true,
+            message: `Ages ${matched.min_age}-${matched.max_age}: ${matched.spots_remaining} spot${matched.spots_remaining !== 1 ? 's' : ''} remaining`
+        };
     };
 
     const handlePayPalCreateOrder = async () => {
@@ -230,6 +248,8 @@ const CampRegistrationPage = () => {
         );
     }
 
+    const ageGroupFeedback = getAgeGroupFeedback();
+
     return (
         <div className="container">
             <div className="section">
@@ -238,6 +258,17 @@ const CampRegistrationPage = () => {
                     <p><strong>Dates:</strong> {new Date(camp.start_date).toLocaleDateString()} - {new Date(camp.end_date).toLocaleDateString()}</p>
                     <p><strong>Price:</strong> ${(camp.price_cents / 100).toFixed(2)}</p>
                     {camp.description && <p>{camp.description}</p>}
+                    {camp.age_groups && camp.age_groups.length > 0 && (
+                        <div className="age-group-spots" style={{ marginTop: '0.5rem' }}>
+                            {camp.age_groups.map((g, i) => (
+                                <p key={i} className="camp-spots" style={{ margin: '0.25rem 0' }}>
+                                    Ages {g.min_age}-{g.max_age}: {g.spots_remaining > 0
+                                        ? `${g.spots_remaining} spot${g.spots_remaining !== 1 ? 's' : ''} remaining`
+                                        : 'Full'}
+                                </p>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -267,6 +298,11 @@ const CampRegistrationPage = () => {
                             onChange={handleChange}
                             required
                         />
+                        {ageGroupFeedback && (
+                            <p className={ageGroupFeedback.eligible ? 'age-group-eligible' : 'age-group-ineligible'}>
+                                {ageGroupFeedback.message}
+                            </p>
+                        )}
                     </div>
                     <div className="form-group">
                         <label htmlFor="yearsPlayed">Years Played</label>

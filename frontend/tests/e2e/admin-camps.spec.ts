@@ -22,6 +22,9 @@ test('admin creates a camp', async ({ page }) => {
   await page.locator('#camp-price').fill('7500');
   await page.locator('#camp-cap').fill('15');
 
+  // Verify slug auto-generated
+  await expect(page.locator('#camp-slug')).toHaveValue('e2e-test-admin-camp');
+
   // Submit
   await page.getByRole('button', { name: 'Create' }).click();
 
@@ -31,6 +34,38 @@ test('admin creates a camp', async ({ page }) => {
   // Verify it appears on public camps page too
   await page.goto('/camps');
   await expect(page.locator('.service-card', { hasText: 'E2E Test Admin Camp' })).toBeVisible();
+});
+
+test('admin creates a camp with age range capacity', async ({ page }) => {
+  await page.goto('/admin/camps');
+  await expect(page.getByRole('heading', { name: 'Manage Camps' })).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole('button', { name: 'Create New Camp' }).click();
+
+  await page.locator('#camp-name').fill('E2E Test Age Range Camp');
+  await page.locator('#camp-desc').fill('Camp with age groups');
+  await page.locator('#camp-start').fill('2026-09-01');
+  await page.locator('#camp-end').fill('2026-09-03');
+  await page.locator('#camp-price').fill('10000');
+
+  // Switch to age range mode
+  await page.getByLabel('Age Range').check();
+
+  // Add age groups
+  await page.getByRole('button', { name: 'Add Age Group' }).click();
+  const rows = page.locator('.age-group-row');
+  await rows.nth(0).locator('input').nth(0).fill('8');
+  await rows.nth(0).locator('input').nth(1).fill('10');
+  await rows.nth(0).locator('input').nth(2).fill('10');
+
+  await page.getByRole('button', { name: 'Add Age Group' }).click();
+  await rows.nth(1).locator('input').nth(0).fill('11');
+  await rows.nth(1).locator('input').nth(1).fill('13');
+  await rows.nth(1).locator('input').nth(2).fill('10');
+
+  await page.getByRole('button', { name: 'Create' }).click();
+
+  await expect(page.locator('.admin-camp-item', { hasText: 'E2E Test Age Range Camp' })).toBeVisible({ timeout: 10_000 });
 });
 
 test('admin views registrations', async ({ page }) => {

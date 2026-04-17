@@ -45,7 +45,30 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 	}
 
 	// Check capacity
-	if camp.MaxCapacity != nil {
+	ageGroups, err := s.campService.GetAgeGroupsByCampID(campID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch age groups: %w", err)
+	}
+
+	if len(ageGroups) > 0 {
+		var matched *models.CampAgeGroup
+		for _, g := range ageGroups {
+			if athlete.Age >= g.MinAge && athlete.Age <= g.MaxAge {
+				matched = &g
+				break
+			}
+		}
+		if matched == nil {
+			return nil, errors.New("athlete age is not eligible for this camp")
+		}
+		count, err := s.campService.GetAgeGroupRegistrationCount(campID, matched.MinAge, matched.MaxAge)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check capacity: %w", err)
+		}
+		if count >= matched.MaxCapacity {
+			return nil, errors.New("age group is at full capacity")
+		}
+	} else if camp.MaxCapacity != nil {
 		count, err := s.campService.GetCampRegistrationCount(campID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check capacity: %w", err)
