@@ -35,8 +35,8 @@ const CampsPage = () => {
         });
     };
 
-    const formatPrice = (cents) => {
-        return `$${(cents / 100).toFixed(2)}`;
+    const formatPrice = (dollars) => {
+        return `$${Number(dollars).toFixed(2)}`;
     };
 
     const isCampFull = (camp) => {
@@ -88,7 +88,7 @@ const CampsPage = () => {
                                 <div className="age-group-spots">
                                     {camp.age_groups.map((g, i) => (
                                         <p key={i} className="camp-spots">
-                                            Ages {g.min_age}-{g.max_age}: {formatPrice(g.price_cents)}
+                                            Ages {g.min_age}-{g.max_age}: {formatPrice(g.price)}
                                             {' — '}
                                             {g.spots_remaining > 0
                                                 ? `${g.spots_remaining} spot${g.spots_remaining !== 1 ? 's' : ''} remaining`
@@ -98,7 +98,7 @@ const CampsPage = () => {
                                 </div>
                             ) : (
                                 <>
-                                    {camp.price_cents && <div className="price">{formatPrice(camp.price_cents)}</div>}
+                                    {camp.price && <div className="price">{formatPrice(camp.price)}</div>}
                                     {camp.spots_remaining !== null && camp.spots_remaining !== undefined && (
                                         <p className="camp-spots">
                                             {camp.spots_remaining > 0

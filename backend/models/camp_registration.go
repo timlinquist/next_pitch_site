@@ -27,7 +27,7 @@ type CampRegistration struct {
 	PaymentMethod         PaymentMethod `json:"payment_method"`
 	StripePaymentIntentID *string       `json:"stripe_payment_intent_id"`
 	PaypalOrderID         *string       `json:"paypal_order_id"`
-	AmountCents           int           `json:"amount_cents"`
+	Amount                float64       `json:"amount"`
 	ParentEmail           string        `json:"parent_email"`
 	CreatedAt             time.Time     `json:"created_at"`
 	UpdatedAt             time.Time     `json:"updated_at"`

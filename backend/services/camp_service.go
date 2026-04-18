@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"errors"
+	"math"
 	"regexp"
 	"sort"
 	"strings"
@@ -17,6 +18,42 @@ type CampService struct {
 
 func NewCampService(db DB) *CampService {
 	return &CampService{db: db}
+}
+
+func centsToDollars(c *int) *float64 {
+	if c == nil {
+		return nil
+	}
+	d := float64(*c) / 100
+	return &d
+}
+
+func dollarsToCents(d *float64) *int {
+	if d == nil {
+		return nil
+	}
+	c := int(math.Round(*d * 100))
+	return &c
+}
+
+func scanCamp(scanner interface{ Scan(...any) error }) (models.Camp, error) {
+	var camp models.Camp
+	var priceCents *int
+	err := scanner.Scan(
+		&camp.ID,
+		&camp.Name,
+		&camp.Description,
+		&camp.StartDate,
+		&camp.EndDate,
+		&priceCents,
+		&camp.MaxCapacity,
+		&camp.Slug,
+		&camp.IsActive,
+		&camp.CreatedAt,
+		&camp.UpdatedAt,
+	)
+	camp.Price = centsToDollars(priceCents)
+	return camp, err
 }
 
 func (s *CampService) GetActiveCamps() ([]models.Camp, error) {
@@ -34,20 +71,7 @@ func (s *CampService) GetActiveCamps() ([]models.Camp, error) {
 
 	var camps []models.Camp
 	for rows.Next() {
-		var camp models.Camp
-		err := rows.Scan(
-			&camp.ID,
-			&camp.Name,
-			&camp.Description,
-			&camp.StartDate,
-			&camp.EndDate,
-			&camp.PriceCents,
-			&camp.MaxCapacity,
-			&camp.Slug,
-			&camp.IsActive,
-			&camp.CreatedAt,
-			&camp.UpdatedAt,
-		)
+		camp, err := scanCamp(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -71,20 +95,7 @@ func (s *CampService) GetAllCamps() ([]models.Camp, error) {
 
 	var camps []models.Camp
 	for rows.Next() {
-		var camp models.Camp
-		err := rows.Scan(
-			&camp.ID,
-			&camp.Name,
-			&camp.Description,
-			&camp.StartDate,
-			&camp.EndDate,
-			&camp.PriceCents,
-			&camp.MaxCapacity,
-			&camp.Slug,
-			&camp.IsActive,
-			&camp.CreatedAt,
-			&camp.UpdatedAt,
-		)
+		camp, err := scanCamp(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -95,25 +106,12 @@ func (s *CampService) GetAllCamps() ([]models.Camp, error) {
 }
 
 func (s *CampService) GetCampByID(id int) (*models.Camp, error) {
-	var camp models.Camp
-	err := s.db.QueryRow(`
+	camp, err := scanCamp(s.db.QueryRow(`
 		SELECT id, name, description, start_date, end_date, price_cents,
 		       max_capacity, slug, is_active, created_at, updated_at
 		FROM camps
 		WHERE id = $1
-	`, id).Scan(
-		&camp.ID,
-		&camp.Name,
-		&camp.Description,
-		&camp.StartDate,
-		&camp.EndDate,
-		&camp.PriceCents,
-		&camp.MaxCapacity,
-		&camp.Slug,
-		&camp.IsActive,
-		&camp.CreatedAt,
-		&camp.UpdatedAt,
-	)
+	`, id))
 
 	if err == sql.ErrNoRows {
 		return nil, errors.New("camp not found")
@@ -126,25 +124,12 @@ func (s *CampService) GetCampByID(id int) (*models.Camp, error) {
 }
 
 func (s *CampService) GetCampBySlug(slug string) (*models.Camp, error) {
-	var camp models.Camp
-	err := s.db.QueryRow(`
+	camp, err := scanCamp(s.db.QueryRow(`
 		SELECT id, name, description, start_date, end_date, price_cents,
 		       max_capacity, slug, is_active, created_at, updated_at
 		FROM camps
 		WHERE slug = $1
-	`, slug).Scan(
-		&camp.ID,
-		&camp.Name,
-		&camp.Description,
-		&camp.StartDate,
-		&camp.EndDate,
-		&camp.PriceCents,
-		&camp.MaxCapacity,
-		&camp.Slug,
-		&camp.IsActive,
-		&camp.CreatedAt,
-		&camp.UpdatedAt,
-	)
+	`, slug))
 
 	if err == sql.ErrNoRows {
 		return nil, errors.New("camp not found")
@@ -181,7 +166,7 @@ func (s *CampService) CreateCamp(camp *models.Camp) error {
 		camp.Description,
 		camp.StartDate,
 		camp.EndDate,
-		camp.PriceCents,
+		dollarsToCents(camp.Price),
 		camp.MaxCapacity,
 		camp.Slug,
 		true,
@@ -210,7 +195,7 @@ func (s *CampService) UpdateCamp(camp *models.Camp) error {
 		camp.Description,
 		camp.StartDate,
 		camp.EndDate,
-		camp.PriceCents,
+		dollarsToCents(camp.Price),
 		camp.MaxCapacity,
 		camp.Slug,
 		now,
@@ -282,10 +267,12 @@ func (s *CampService) GetAgeGroupsByCampID(campID int) ([]models.CampAgeGroup, e
 	var groups []models.CampAgeGroup
 	for rows.Next() {
 		var g models.CampAgeGroup
-		err := rows.Scan(&g.ID, &g.CampID, &g.MinAge, &g.MaxAge, &g.MaxCapacity, &g.PriceCents, &g.CreatedAt, &g.UpdatedAt)
+		var priceCents int
+		err := rows.Scan(&g.ID, &g.CampID, &g.MinAge, &g.MaxAge, &g.MaxCapacity, &priceCents, &g.CreatedAt, &g.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
+		g.Price = float64(priceCents) / 100
 		groups = append(groups, g)
 	}
 
@@ -308,7 +295,7 @@ func (s *CampService) SetAgeGroups(campID int, groups []models.CampAgeGroup) err
 		_, err = tx.Exec(`
 			INSERT INTO camp_age_groups (camp_id, min_age, max_age, max_capacity, price_cents)
 			VALUES ($1, $2, $3, $4, $5)
-		`, campID, g.MinAge, g.MaxAge, g.MaxCapacity, g.PriceCents)
+		`, campID, g.MinAge, g.MaxAge, g.MaxCapacity, int(math.Round(g.Price*100)))
 		if err != nil {
 			return err
 		}

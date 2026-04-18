@@ -270,7 +270,7 @@ func (s *EmailService) SendCampRegistrationConfirmation(reg *models.CampRegistra
 	data := CampRegistrationEmailData{
 		Athlete: athlete,
 		Camp:    camp,
-		Amount:  fmt.Sprintf("$%.2f", float64(reg.AmountCents)/100),
+		Amount:  fmt.Sprintf("$%.2f", reg.Amount),
 		RegTime: time.Now(),
 	}
 
@@ -289,7 +289,7 @@ func (s *EmailService) SendAdminCampRegistrationNotification(reg *models.CampReg
 	data := CampRegistrationEmailData{
 		Athlete: athlete,
 		Camp:    camp,
-		Amount:  fmt.Sprintf("$%.2f", float64(reg.AmountCents)/100),
+		Amount:  fmt.Sprintf("$%.2f", reg.Amount),
 		RegTime: time.Now(),
 	}
 

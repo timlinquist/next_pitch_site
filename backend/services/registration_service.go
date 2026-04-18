@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"sync"
@@ -34,8 +35,19 @@ func NewRegistrationService(db DB, campService *CampService) *RegistrationServic
 	}
 }
 
+func scanRegistration(scanner interface{ Scan(...any) error }) (models.CampRegistration, error) {
+	var reg models.CampRegistration
+	var amountCents int
+	err := scanner.Scan(
+		&reg.ID, &reg.AthleteID, &reg.CampID, &reg.PaymentStatus, &reg.PaymentMethod,
+		&reg.StripePaymentIntentID, &reg.PaypalOrderID, &amountCents,
+		&reg.ParentEmail, &reg.CreatedAt, &reg.UpdatedAt,
+	)
+	reg.Amount = float64(amountCents) / 100
+	return reg, err
+}
+
 func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athlete, campID int, paymentMethod models.PaymentMethod) (*models.CampRegistration, error) {
-	// Validate the camp exists and is active
 	camp, err := s.campService.GetCampByID(campID)
 	if err != nil {
 		return nil, fmt.Errorf("camp not found: %w", err)
@@ -44,15 +56,14 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 		return nil, errors.New("camp is not active")
 	}
 
-	// Check capacity
 	ageGroups, err := s.campService.GetAgeGroupsByCampID(campID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch age groups: %w", err)
 	}
 
-	var priceCents int
-	if camp.PriceCents != nil {
-		priceCents = *camp.PriceCents
+	var price float64
+	if camp.Price != nil {
+		price = *camp.Price
 	}
 	if len(ageGroups) > 0 {
 		var matched *models.CampAgeGroup
@@ -72,7 +83,7 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 		if count >= matched.MaxCapacity {
 			return nil, errors.New("age group is at full capacity")
 		}
-		priceCents = matched.PriceCents
+		price = matched.Price
 	} else if camp.MaxCapacity != nil {
 		count, err := s.campService.GetCampRegistrationCount(campID)
 		if err != nil {
@@ -83,6 +94,8 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 		}
 	}
 
+	amountCents := int(math.Round(price * 100))
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -91,7 +104,6 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 
 	now := time.Now()
 
-	// Insert athlete
 	var athleteID int
 	err = tx.QueryRow(`
 		INSERT INTO athletes (name, age, years_played, position, parent_email, parent_phone, created_at, updated_at)
@@ -112,13 +124,12 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 
 	athlete.ID = athleteID
 
-	// Insert pending registration
 	reg := &models.CampRegistration{
 		AthleteID:     athleteID,
 		CampID:        campID,
 		PaymentStatus: models.PaymentStatusPending,
 		PaymentMethod: paymentMethod,
-		AmountCents:   priceCents,
+		Amount:        price,
 		ParentEmail:   athlete.ParentEmail,
 	}
 
@@ -131,7 +142,7 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 		reg.CampID,
 		reg.PaymentStatus,
 		reg.PaymentMethod,
-		reg.AmountCents,
+		amountCents,
 		reg.ParentEmail,
 		now,
 	).Scan(&reg.ID)
@@ -157,7 +168,7 @@ func (s *RegistrationService) InitiateStripePayment(registrationID int) (string,
 	}
 
 	params := &stripe.PaymentIntentParams{
-		Amount:   stripe.Int64(int64(reg.AmountCents)),
+		Amount:   stripe.Int64(int64(math.Round(reg.Amount * 100))),
 		Currency: stripe.String("usd"),
 		AutomaticPaymentMethods: &stripe.PaymentIntentAutomaticPaymentMethodsParams{
 			Enabled: stripe.Bool(true),
@@ -172,7 +183,6 @@ func (s *RegistrationService) InitiateStripePayment(registrationID int) (string,
 		return "", fmt.Errorf("failed to create payment intent: %w", err)
 	}
 
-	// Store the payment intent ID on the registration
 	_, err = s.db.Exec(`
 		UPDATE camp_registrations
 		SET stripe_payment_intent_id = $1, updated_at = CURRENT_TIMESTAMP
@@ -192,14 +202,13 @@ func (s *RegistrationService) ConfirmStripePayment(registrationID int) error {
 	}
 
 	if reg.PaymentStatus == models.PaymentStatusPaid {
-		return nil // Already paid, idempotent
+		return nil
 	}
 
 	if reg.StripePaymentIntentID == nil {
 		return errors.New("no stripe payment intent found for this registration")
 	}
 
-	// Verify with Stripe API
 	pi, err := paymentintent.Get(*reg.StripePaymentIntentID, nil)
 	if err != nil {
 		return fmt.Errorf("failed to verify payment intent: %w", err)
@@ -248,21 +257,16 @@ func (s *RegistrationService) HandleStripeWebhook(payload []byte, signature stri
 }
 
 func (s *RegistrationService) updateRegistrationByStripePI(paymentIntentID string, status models.PaymentStatus) (*models.CampRegistration, error) {
-	var reg models.CampRegistration
-	err := s.db.QueryRow(`
+	reg, err := scanRegistration(s.db.QueryRow(`
 		UPDATE camp_registrations
 		SET payment_status = $1, updated_at = CURRENT_TIMESTAMP
 		WHERE stripe_payment_intent_id = $2 AND payment_status != 'paid'
 		RETURNING id, athlete_id, camp_id, payment_status, payment_method,
 		          stripe_payment_intent_id, paypal_order_id, amount_cents,
 		          parent_email, created_at, updated_at
-	`, status, paymentIntentID).Scan(
-		&reg.ID, &reg.AthleteID, &reg.CampID, &reg.PaymentStatus, &reg.PaymentMethod,
-		&reg.StripePaymentIntentID, &reg.PaypalOrderID, &reg.AmountCents,
-		&reg.ParentEmail, &reg.CreatedAt, &reg.UpdatedAt,
-	)
+	`, status, paymentIntentID))
 	if err == sql.ErrNoRows {
-		return nil, nil // Already processed or not found, idempotent
+		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to update registration: %w", err)
@@ -334,14 +338,13 @@ func (s *RegistrationService) CreatePayPalOrder(registrationID int) (string, err
 		apiBase = "https://api-m.sandbox.paypal.com"
 	}
 
-	dollars := fmt.Sprintf("%.2f", float64(reg.AmountCents)/100)
-	orderBody := map[string]interface{}{
+	orderBody := map[string]any{
 		"intent": "CAPTURE",
-		"purchase_units": []map[string]interface{}{
+		"purchase_units": []map[string]any{
 			{
-				"amount": map[string]interface{}{
+				"amount": map[string]any{
 					"currency_code": "USD",
-					"value":         dollars,
+					"value":         fmt.Sprintf("%.2f", reg.Amount),
 				},
 				"custom_id": fmt.Sprintf("registration_%d", reg.ID),
 			},
@@ -378,7 +381,6 @@ func (s *RegistrationService) CreatePayPalOrder(registrationID int) (string, err
 		return "", err
 	}
 
-	// Store paypal order ID on the registration
 	_, err = s.db.Exec(`
 		UPDATE camp_registrations
 		SET paypal_order_id = $1, updated_at = CURRENT_TIMESTAMP
@@ -398,7 +400,7 @@ func (s *RegistrationService) CapturePayPalOrder(registrationID int, paypalOrder
 	}
 
 	if reg.PaymentStatus == models.PaymentStatusPaid {
-		return nil // Already paid, idempotent
+		return nil
 	}
 
 	if reg.PaypalOrderID == nil || *reg.PaypalOrderID != paypalOrderID {
@@ -459,18 +461,13 @@ func (s *RegistrationService) CapturePayPalOrder(registrationID int, paypalOrder
 // Query methods
 
 func (s *RegistrationService) GetRegistrationByID(id int) (*models.CampRegistration, error) {
-	var reg models.CampRegistration
-	err := s.db.QueryRow(`
+	reg, err := scanRegistration(s.db.QueryRow(`
 		SELECT id, athlete_id, camp_id, payment_status, payment_method,
 		       stripe_payment_intent_id, paypal_order_id, amount_cents,
 		       parent_email, created_at, updated_at
 		FROM camp_registrations
 		WHERE id = $1
-	`, id).Scan(
-		&reg.ID, &reg.AthleteID, &reg.CampID, &reg.PaymentStatus, &reg.PaymentMethod,
-		&reg.StripePaymentIntentID, &reg.PaypalOrderID, &reg.AmountCents,
-		&reg.ParentEmail, &reg.CreatedAt, &reg.UpdatedAt,
-	)
+	`, id))
 
 	if err == sql.ErrNoRows {
 		return nil, errors.New("registration not found")
@@ -507,11 +504,12 @@ func (s *RegistrationService) GetRegistrationsByCampID(campID int) ([]Registrati
 	var results []RegistrationWithAthlete
 	for rows.Next() {
 		var r RegistrationWithAthlete
+		var amountCents int
 		err := rows.Scan(
 			&r.Registration.ID, &r.Registration.AthleteID, &r.Registration.CampID,
 			&r.Registration.PaymentStatus, &r.Registration.PaymentMethod,
 			&r.Registration.StripePaymentIntentID, &r.Registration.PaypalOrderID,
-			&r.Registration.AmountCents, &r.Registration.ParentEmail,
+			&amountCents, &r.Registration.ParentEmail,
 			&r.Registration.CreatedAt, &r.Registration.UpdatedAt,
 			&r.Athlete.ID, &r.Athlete.Name, &r.Athlete.Age, &r.Athlete.YearsPlayed,
 			&r.Athlete.Position, &r.Athlete.UserID, &r.Athlete.ParentEmail,
@@ -520,6 +518,7 @@ func (s *RegistrationService) GetRegistrationsByCampID(campID int) ([]Registrati
 		if err != nil {
 			return nil, err
 		}
+		r.Registration.Amount = float64(amountCents) / 100
 		results = append(results, r)
 	}
 

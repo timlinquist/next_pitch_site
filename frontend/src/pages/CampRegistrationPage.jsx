@@ -90,7 +90,7 @@ const StripeCheckoutForm = ({ camp, athleteData, onSuccess, onError, setProcessi
             </div>
             {cardError && <p className="payment-error">{cardError}</p>}
             <button type="submit" className="btn register-btn" disabled={!stripe}>
-                Pay {camp ? `$${(displayPrice / 100).toFixed(2)}` : ''}
+                Pay {camp ? `$${Number(displayPrice).toFixed(2)}` : ''}
             </button>
         </form>
     );
@@ -163,14 +163,14 @@ const CampRegistrationPage = () => {
         }
         return {
             eligible: true,
-            message: `Ages ${matched.min_age}-${matched.max_age}: $${(matched.price_cents / 100).toFixed(2)} — ${matched.spots_remaining} spot${matched.spots_remaining !== 1 ? 's' : ''} remaining`
+            message: `Ages ${matched.min_age}-${matched.max_age}: $${Number(matched.price).toFixed(2)} — ${matched.spots_remaining} spot${matched.spots_remaining !== 1 ? 's' : ''} remaining`
         };
     };
 
     const getDisplayPrice = () => {
         const matched = getMatchedAgeGroup();
-        if (matched) return matched.price_cents;
-        return camp?.price_cents || 0;
+        if (matched) return matched.price;
+        return camp?.price || 0;
     };
 
     const handlePayPalCreateOrder = async () => {
@@ -254,7 +254,7 @@ const CampRegistrationPage = () => {
                     <div className="success-details">
                         <p><strong>Camp:</strong> {camp.name}</p>
                         <p><strong>Dates:</strong> {new Date(camp.start_date).toLocaleDateString()} - {new Date(camp.end_date).toLocaleDateString()}</p>
-                        <p><strong>Amount Paid:</strong> ${(getDisplayPrice() / 100).toFixed(2)}</p>
+                        <p><strong>Amount Paid:</strong> ${Number(getDisplayPrice()).toFixed(2)}</p>
                     </div>
                 </div>
             </div>
@@ -273,7 +273,7 @@ const CampRegistrationPage = () => {
                         <div className="age-group-spots" style={{ marginTop: '0.5rem' }}>
                             {camp.age_groups.map((g, i) => (
                                 <p key={i} className="camp-spots" style={{ margin: '0.25rem 0' }}>
-                                    Ages {g.min_age}-{g.max_age}: ${(g.price_cents / 100).toFixed(2)}
+                                    Ages {g.min_age}-{g.max_age}: ${Number(g.price).toFixed(2)}
                                     {' — '}
                                     {g.spots_remaining > 0
                                         ? `${g.spots_remaining} spot${g.spots_remaining !== 1 ? 's' : ''} remaining`
@@ -281,8 +281,8 @@ const CampRegistrationPage = () => {
                                 </p>
                             ))}
                         </div>
-                    ) : camp.price_cents ? (
-                        <p><strong>Price:</strong> ${(camp.price_cents / 100).toFixed(2)}</p>
+                    ) : camp.price ? (
+                        <p><strong>Price:</strong> ${Number(camp.price).toFixed(2)}</p>
                     ) : null}
                     {camp.description && <p>{camp.description}</p>}
                 </div>

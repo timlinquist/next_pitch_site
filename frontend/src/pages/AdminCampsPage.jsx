@@ -162,7 +162,7 @@ const AdminCampsPage = () => {
                 description: formData.description,
                 start_date: formData.start_date + 'T00:00:00Z',
                 end_date: formData.end_date + 'T00:00:00Z',
-                price_cents: formData.capacity_mode === 'simple' ? Math.round(parseFloat(formData.price) * 100) : null,
+                price: formData.capacity_mode === 'simple' ? parseFloat(formData.price) : null,
                 slug: formData.slug || null,
                 max_capacity: formData.capacity_mode === 'simple' && formData.max_capacity
                     ? parseInt(formData.max_capacity)
@@ -172,7 +172,7 @@ const AdminCampsPage = () => {
                         min_age: parseInt(g.min_age),
                         max_age: parseInt(g.max_age),
                         max_capacity: parseInt(g.max_capacity),
-                        price_cents: Math.round(parseFloat(g.price) * 100),
+                        price: parseFloat(g.price),
                     }))
                     : [],
             };
@@ -209,7 +209,7 @@ const AdminCampsPage = () => {
             description: camp.description || '',
             start_date: camp.start_date.split('T')[0],
             end_date: camp.end_date.split('T')[0],
-            price: camp.price_cents ? String(camp.price_cents / 100) : '',
+            price: camp.price ? String(camp.price) : '',
             max_capacity: camp.max_capacity ? String(camp.max_capacity) : '',
             slug: camp.slug || '',
             capacity_mode: hasAgeGroups ? 'age_range' : 'simple',
@@ -218,7 +218,7 @@ const AdminCampsPage = () => {
                     min_age: String(g.min_age),
                     max_age: String(g.max_age),
                     max_capacity: String(g.max_capacity),
-                    price: String(g.price_cents / 100),
+                    price: String(g.price),
                 }))
                 : [],
         });
@@ -408,10 +408,10 @@ const AdminCampsPage = () => {
                                             {new Date(camp.start_date).toLocaleDateString()} - {new Date(camp.end_date).toLocaleDateString()}
                                             {camp.age_groups && camp.age_groups.length > 0
                                                 ? camp.age_groups.map((g, i) => (
-                                                    <span key={i}>{' | '}Ages {g.min_age}-{g.max_age}: ${(g.price_cents / 100).toFixed(2)} ({g.registered_count}/{g.max_capacity})</span>
+                                                    <span key={i}>{' | '}Ages {g.min_age}-{g.max_age}: ${Number(g.price).toFixed(2)} ({g.registered_count}/{g.max_capacity})</span>
                                                 ))
                                                 : <>
-                                                    {camp.price_cents ? ` | $${(camp.price_cents / 100).toFixed(2)}` : ''}
+                                                    {camp.price ? ` | $${Number(camp.price).toFixed(2)}` : ''}
                                                     {camp.max_capacity ? ` | Capacity: ${camp.registered_count}/${camp.max_capacity}` : ''}
                                                 </>
                                             }
@@ -462,7 +462,7 @@ const AdminCampsPage = () => {
                                                                     {r.registration.payment_status}
                                                                 </span>
                                                             </td>
-                                                            <td>${(r.registration.amount_cents / 100).toFixed(2)}</td>
+                                                            <td>${Number(r.registration.amount).toFixed(2)}</td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
