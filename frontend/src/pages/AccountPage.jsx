@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { Navigate } from 'react-router-dom';
-import config from '../config';
 import { getApiUrl } from '../utils/api';
 
 const AccountPage = () => {
@@ -76,7 +75,7 @@ const AccountPage = () => {
                         top: '1rem',
                         right: '1rem',
                     }}
-                    onClick={() => logout({  })}
+                    onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
                 >
                     Logout
                 </button>
