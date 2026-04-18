@@ -35,8 +35,16 @@ This runs migrations, starts the Go API on :8080, and Vite on :5173 (proxies `/a
 
 Other useful targets:
 - `make migrate` — run DB migrations only
-- `make test` — run backend + frontend tests
-- `make test-backend` / `make test-frontend` — run tests individually
+- `make test` — run backend + frontend unit tests
+- `make test-backend` / `make test-frontend` — run unit tests individually
+- `make test-e2e` — run Playwright E2E tests (auto-starts servers, runs migrations, cleans up test data)
+- `make test-all` — run all tests (backend + frontend unit + E2E)
 - `make build` — production build (backend binary + frontend dist)
+
+## Testing
+
+**After completing any feature or bug fix**, always run `make test-all` before considering the work done. This runs backend unit tests, frontend unit tests, and Playwright E2E tests. The E2E suite handles its own setup (migrations, server startup) and teardown (test data cleanup) automatically.
+
+Stop the dev server (`make dev:stop`) before running E2E tests — the test runner starts its own servers.
 
 `npm run build` is for production only (output to `frontend/dist/`, served by Go).

@@ -10,7 +10,7 @@ type Camp struct {
 	Description string    `json:"description"`
 	StartDate   time.Time `json:"start_date" binding:"required"`
 	EndDate     time.Time `json:"end_date" binding:"required"`
-	PriceCents  int       `json:"price_cents" binding:"required"`
+	PriceCents  *int      `json:"price_cents"`
 	MaxCapacity *int      `json:"max_capacity"`
 	Slug        *string   `json:"slug"`
 	IsActive    bool      `json:"is_active"`

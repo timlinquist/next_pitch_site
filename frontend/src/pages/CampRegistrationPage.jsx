@@ -20,7 +20,7 @@ const CARD_ELEMENT_OPTIONS = {
     },
 };
 
-const StripeCheckoutForm = ({ camp, athleteData, onSuccess, onError, setProcessing }) => {
+const StripeCheckoutForm = ({ camp, athleteData, onSuccess, onError, setProcessing, displayPrice }) => {
     const stripe = useStripe();
     const elements = useElements();
     const [cardError, setCardError] = useState(null);
@@ -90,7 +90,7 @@ const StripeCheckoutForm = ({ camp, athleteData, onSuccess, onError, setProcessi
             </div>
             {cardError && <p className="payment-error">{cardError}</p>}
             <button type="submit" className="btn register-btn" disabled={!stripe}>
-                Pay {camp ? `$${(camp.price_cents / 100).toFixed(2)}` : ''}
+                Pay {camp ? `$${(displayPrice / 100).toFixed(2)}` : ''}
             </button>
         </form>
     );
@@ -142,12 +142,19 @@ const CampRegistrationPage = () => {
         return athleteData.name && athleteData.age && athleteData.parentEmail;
     };
 
+    const getMatchedAgeGroup = () => {
+        if (!camp?.age_groups?.length || !athleteData.age) return null;
+        const age = parseInt(athleteData.age);
+        if (isNaN(age)) return null;
+        return camp.age_groups.find(g => age >= g.min_age && age <= g.max_age) || null;
+    };
+
     const getAgeGroupFeedback = () => {
         if (!camp?.age_groups?.length || !athleteData.age) return null;
         const age = parseInt(athleteData.age);
         if (isNaN(age)) return null;
 
-        const matched = camp.age_groups.find(g => age >= g.min_age && age <= g.max_age);
+        const matched = getMatchedAgeGroup();
         if (!matched) {
             return { eligible: false, message: 'This age is not eligible for this camp' };
         }
@@ -156,8 +163,14 @@ const CampRegistrationPage = () => {
         }
         return {
             eligible: true,
-            message: `Ages ${matched.min_age}-${matched.max_age}: ${matched.spots_remaining} spot${matched.spots_remaining !== 1 ? 's' : ''} remaining`
+            message: `Ages ${matched.min_age}-${matched.max_age}: $${(matched.price_cents / 100).toFixed(2)} — ${matched.spots_remaining} spot${matched.spots_remaining !== 1 ? 's' : ''} remaining`
         };
+    };
+
+    const getDisplayPrice = () => {
+        const matched = getMatchedAgeGroup();
+        if (matched) return matched.price_cents;
+        return camp?.price_cents || 0;
     };
 
     const handlePayPalCreateOrder = async () => {
@@ -241,7 +254,7 @@ const CampRegistrationPage = () => {
                     <div className="success-details">
                         <p><strong>Camp:</strong> {camp.name}</p>
                         <p><strong>Dates:</strong> {new Date(camp.start_date).toLocaleDateString()} - {new Date(camp.end_date).toLocaleDateString()}</p>
-                        <p><strong>Amount Paid:</strong> ${(camp.price_cents / 100).toFixed(2)}</p>
+                        <p><strong>Amount Paid:</strong> ${(getDisplayPrice() / 100).toFixed(2)}</p>
                     </div>
                 </div>
             </div>
@@ -256,19 +269,22 @@ const CampRegistrationPage = () => {
                 <h1>Register for {camp.name}</h1>
                 <div className="camp-info-banner">
                     <p><strong>Dates:</strong> {new Date(camp.start_date).toLocaleDateString()} - {new Date(camp.end_date).toLocaleDateString()}</p>
-                    <p><strong>Price:</strong> ${(camp.price_cents / 100).toFixed(2)}</p>
-                    {camp.description && <p>{camp.description}</p>}
-                    {camp.age_groups && camp.age_groups.length > 0 && (
+                    {camp.age_groups && camp.age_groups.length > 0 ? (
                         <div className="age-group-spots" style={{ marginTop: '0.5rem' }}>
                             {camp.age_groups.map((g, i) => (
                                 <p key={i} className="camp-spots" style={{ margin: '0.25rem 0' }}>
-                                    Ages {g.min_age}-{g.max_age}: {g.spots_remaining > 0
+                                    Ages {g.min_age}-{g.max_age}: ${(g.price_cents / 100).toFixed(2)}
+                                    {' — '}
+                                    {g.spots_remaining > 0
                                         ? `${g.spots_remaining} spot${g.spots_remaining !== 1 ? 's' : ''} remaining`
                                         : 'Full'}
                                 </p>
                             ))}
                         </div>
-                    )}
+                    ) : camp.price_cents ? (
+                        <p><strong>Price:</strong> ${(camp.price_cents / 100).toFixed(2)}</p>
+                    ) : null}
+                    {camp.description && <p>{camp.description}</p>}
                 </div>
             </div>
 
@@ -380,6 +396,7 @@ const CampRegistrationPage = () => {
                                 onSuccess={() => setSuccess(true)}
                                 onError={(msg) => setError(msg)}
                                 setProcessing={setProcessing}
+                                displayPrice={getDisplayPrice()}
                             />
                         </Elements>
                     ) : (

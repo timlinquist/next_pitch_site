@@ -99,7 +99,7 @@ const AdminCampsPage = () => {
     const addAgeGroup = () => {
         setFormData({
             ...formData,
-            age_groups: [...formData.age_groups, { min_age: '', max_age: '', max_capacity: '' }],
+            age_groups: [...formData.age_groups, { min_age: '', max_age: '', max_capacity: '', price_cents: '' }],
         });
     };
 
@@ -110,12 +110,15 @@ const AdminCampsPage = () => {
 
     const validateAgeGroups = () => {
         const groups = formData.age_groups
-            .map(g => ({ min_age: parseInt(g.min_age), max_age: parseInt(g.max_age), max_capacity: parseInt(g.max_capacity) }))
+            .map(g => ({ min_age: parseInt(g.min_age), max_age: parseInt(g.max_age), max_capacity: parseInt(g.max_capacity), price_cents: parseInt(g.price_cents) }))
             .sort((a, b) => a.min_age - b.min_age);
 
         for (let i = 0; i < groups.length; i++) {
-            if (isNaN(groups[i].min_age) || isNaN(groups[i].max_age) || isNaN(groups[i].max_capacity)) {
+            if (isNaN(groups[i].min_age) || isNaN(groups[i].max_age) || isNaN(groups[i].max_capacity) || isNaN(groups[i].price_cents)) {
                 return 'All age group fields are required';
+            }
+            if (groups[i].price_cents <= 0) {
+                return 'Price must be greater than 0';
             }
             if (groups[i].min_age > groups[i].max_age) {
                 return 'Min age cannot be greater than max age';
@@ -159,7 +162,7 @@ const AdminCampsPage = () => {
                 description: formData.description,
                 start_date: formData.start_date + 'T00:00:00Z',
                 end_date: formData.end_date + 'T00:00:00Z',
-                price_cents: parseInt(formData.price_cents),
+                price_cents: formData.capacity_mode === 'simple' ? parseInt(formData.price_cents) : null,
                 slug: formData.slug || null,
                 max_capacity: formData.capacity_mode === 'simple' && formData.max_capacity
                     ? parseInt(formData.max_capacity)
@@ -169,6 +172,7 @@ const AdminCampsPage = () => {
                         min_age: parseInt(g.min_age),
                         max_age: parseInt(g.max_age),
                         max_capacity: parseInt(g.max_capacity),
+                        price_cents: parseInt(g.price_cents),
                     }))
                     : [],
             };
@@ -205,7 +209,7 @@ const AdminCampsPage = () => {
             description: camp.description || '',
             start_date: camp.start_date.split('T')[0],
             end_date: camp.end_date.split('T')[0],
-            price_cents: String(camp.price_cents),
+            price_cents: camp.price_cents ? String(camp.price_cents) : '',
             max_capacity: camp.max_capacity ? String(camp.max_capacity) : '',
             slug: camp.slug || '',
             capacity_mode: hasAgeGroups ? 'age_range' : 'simple',
@@ -214,6 +218,7 @@ const AdminCampsPage = () => {
                     min_age: String(g.min_age),
                     max_age: String(g.max_age),
                     max_capacity: String(g.max_capacity),
+                    price_cents: String(g.price_cents),
                 }))
                 : [],
         });
@@ -298,11 +303,6 @@ const AdminCampsPage = () => {
                             <label htmlFor="camp-end">End Date</label>
                             <input type="date" id="camp-end" name="end_date" value={formData.end_date} onChange={handleFormChange} required />
                         </div>
-                        <div className="form-group">
-                            <label htmlFor="camp-price">Price (cents)</label>
-                            <input type="number" id="camp-price" name="price_cents" value={formData.price_cents} onChange={handleFormChange} required min="0" />
-                        </div>
-
                         <div className="form-group capacity-mode-toggle">
                             <label>Capacity Mode</label>
                             <div className="capacity-mode-options">
@@ -330,10 +330,16 @@ const AdminCampsPage = () => {
                         </div>
 
                         {formData.capacity_mode === 'simple' ? (
-                            <div className="form-group">
-                                <label htmlFor="camp-cap">Max Capacity</label>
-                                <input type="number" id="camp-cap" name="max_capacity" value={formData.max_capacity} onChange={handleFormChange} min="1" placeholder="Leave blank for unlimited" />
-                            </div>
+                            <>
+                                <div className="form-group">
+                                    <label htmlFor="camp-price">Price (cents)</label>
+                                    <input type="number" id="camp-price" name="price_cents" value={formData.price_cents} onChange={handleFormChange} required min="1" />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="camp-cap">Max Capacity</label>
+                                    <input type="number" id="camp-cap" name="max_capacity" value={formData.max_capacity} onChange={handleFormChange} min="1" placeholder="Leave blank for unlimited" />
+                                </div>
+                            </>
                         ) : (
                             <div className="age-group-editor">
                                 <label>Age Groups</label>
@@ -360,6 +366,14 @@ const AdminCampsPage = () => {
                                             placeholder="Capacity"
                                             value={group.max_capacity}
                                             onChange={(e) => handleAgeGroupChange(index, 'max_capacity', e.target.value)}
+                                            min="1"
+                                            required
+                                        />
+                                        <input
+                                            type="number"
+                                            placeholder="Price (cents)"
+                                            value={group.price_cents}
+                                            onChange={(e) => handleAgeGroupChange(index, 'price_cents', e.target.value)}
                                             min="1"
                                             required
                                         />
@@ -391,12 +405,14 @@ const AdminCampsPage = () => {
                                         <h3>{camp.name} {camp.slug && <span className="camp-slug">/{camp.slug}</span>} {!camp.is_active && <span className="badge-inactive">Inactive</span>}</h3>
                                         <p>
                                             {new Date(camp.start_date).toLocaleDateString()} - {new Date(camp.end_date).toLocaleDateString()}
-                                            {' | '}${(camp.price_cents / 100).toFixed(2)}
                                             {camp.age_groups && camp.age_groups.length > 0
                                                 ? camp.age_groups.map((g, i) => (
-                                                    <span key={i}>{' | '}Ages {g.min_age}-{g.max_age}: {g.registered_count}/{g.max_capacity}</span>
+                                                    <span key={i}>{' | '}Ages {g.min_age}-{g.max_age}: ${(g.price_cents / 100).toFixed(2)} ({g.registered_count}/{g.max_capacity})</span>
                                                 ))
-                                                : camp.max_capacity && ` | Capacity: ${camp.registered_count}/${camp.max_capacity}`
+                                                : <>
+                                                    {camp.price_cents ? ` | $${(camp.price_cents / 100).toFixed(2)}` : ''}
+                                                    {camp.max_capacity ? ` | Capacity: ${camp.registered_count}/${camp.max_capacity}` : ''}
+                                                </>
                                             }
                                         </p>
                                     </div>

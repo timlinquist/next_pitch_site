@@ -60,12 +60,12 @@ export async function seedTestCamp(overrides: Partial<{
   return result.rows[0];
 }
 
-export async function seedTestCampAgeGroups(campId: number, groups: { min_age: number; max_age: number; max_capacity: number }[]) {
+export async function seedTestCampAgeGroups(campId: number, groups: { min_age: number; max_age: number; max_capacity: number; price_cents: number }[]) {
   for (const g of groups) {
     await db().query(
-      `INSERT INTO camp_age_groups (camp_id, min_age, max_age, max_capacity)
-       VALUES ($1, $2, $3, $4)`,
-      [campId, g.min_age, g.max_age, g.max_capacity]
+      `INSERT INTO camp_age_groups (camp_id, min_age, max_age, max_capacity, price_cents)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [campId, g.min_age, g.max_age, g.max_capacity, g.price_cents]
     );
   }
 }

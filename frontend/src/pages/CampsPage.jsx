@@ -84,28 +84,34 @@ const CampsPage = () => {
                     {camps.map((camp) => (
                         <div key={camp.id} className="service-card">
                             <h3>{camp.name}</h3>
-                            <div className="price">{formatPrice(camp.price_cents)}</div>
-                            <p className="duration">
-                                {formatDate(camp.start_date)} - {formatDate(camp.end_date)}
-                            </p>
-                            <p className="description">{camp.description}</p>
                             {camp.age_groups && camp.age_groups.length > 0 ? (
                                 <div className="age-group-spots">
                                     {camp.age_groups.map((g, i) => (
                                         <p key={i} className="camp-spots">
-                                            Ages {g.min_age}-{g.max_age}: {g.spots_remaining > 0
+                                            Ages {g.min_age}-{g.max_age}: {formatPrice(g.price_cents)}
+                                            {' — '}
+                                            {g.spots_remaining > 0
                                                 ? `${g.spots_remaining} spot${g.spots_remaining !== 1 ? 's' : ''} remaining`
                                                 : 'Full'}
                                         </p>
                                     ))}
                                 </div>
-                            ) : camp.spots_remaining !== null && camp.spots_remaining !== undefined && (
-                                <p className="camp-spots">
-                                    {camp.spots_remaining > 0
-                                        ? `${camp.spots_remaining} spot${camp.spots_remaining !== 1 ? 's' : ''} remaining`
-                                        : 'Full'}
-                                </p>
+                            ) : (
+                                <>
+                                    {camp.price_cents && <div className="price">{formatPrice(camp.price_cents)}</div>}
+                                    {camp.spots_remaining !== null && camp.spots_remaining !== undefined && (
+                                        <p className="camp-spots">
+                                            {camp.spots_remaining > 0
+                                                ? `${camp.spots_remaining} spot${camp.spots_remaining !== 1 ? 's' : ''} remaining`
+                                                : 'Full'}
+                                        </p>
+                                    )}
+                                </>
                             )}
+                            <p className="duration">
+                                {formatDate(camp.start_date)} - {formatDate(camp.end_date)}
+                            </p>
+                            <p className="description">{camp.description}</p>
                             {isCampFull(camp) ? (
                                 <button className="btn" disabled>Full</button>
                             ) : (

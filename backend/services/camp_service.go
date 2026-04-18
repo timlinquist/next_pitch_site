@@ -269,7 +269,7 @@ func (s *CampService) GetCampRegistrationCount(campID int) (int, error) {
 
 func (s *CampService) GetAgeGroupsByCampID(campID int) ([]models.CampAgeGroup, error) {
 	rows, err := s.db.Query(`
-		SELECT id, camp_id, min_age, max_age, max_capacity, created_at, updated_at
+		SELECT id, camp_id, min_age, max_age, max_capacity, price_cents, created_at, updated_at
 		FROM camp_age_groups
 		WHERE camp_id = $1
 		ORDER BY min_age ASC
@@ -282,7 +282,7 @@ func (s *CampService) GetAgeGroupsByCampID(campID int) ([]models.CampAgeGroup, e
 	var groups []models.CampAgeGroup
 	for rows.Next() {
 		var g models.CampAgeGroup
-		err := rows.Scan(&g.ID, &g.CampID, &g.MinAge, &g.MaxAge, &g.MaxCapacity, &g.CreatedAt, &g.UpdatedAt)
+		err := rows.Scan(&g.ID, &g.CampID, &g.MinAge, &g.MaxAge, &g.MaxCapacity, &g.PriceCents, &g.CreatedAt, &g.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -306,9 +306,9 @@ func (s *CampService) SetAgeGroups(campID int, groups []models.CampAgeGroup) err
 
 	for _, g := range groups {
 		_, err = tx.Exec(`
-			INSERT INTO camp_age_groups (camp_id, min_age, max_age, max_capacity)
-			VALUES ($1, $2, $3, $4)
-		`, campID, g.MinAge, g.MaxAge, g.MaxCapacity)
+			INSERT INTO camp_age_groups (camp_id, min_age, max_age, max_capacity, price_cents)
+			VALUES ($1, $2, $3, $4, $5)
+		`, campID, g.MinAge, g.MaxAge, g.MaxCapacity, g.PriceCents)
 		if err != nil {
 			return err
 		}

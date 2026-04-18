@@ -21,7 +21,7 @@ async function fillAthleteForm(page: import('@playwright/test').Page) {
 }
 
 test('form validation blocks incomplete submissions', async ({ page }) => {
-  await page.goto(`/camps/${camp.id}/register`);
+  await page.goto(`/camps/${camp.slug}/register`);
   await expect(page.getByRole('heading', { name: `Register for ${camp.name}` })).toBeVisible();
 
   const payButton = page.locator('button.register-btn');
@@ -32,12 +32,12 @@ test('form validation blocks incomplete submissions', async ({ page }) => {
   await expect(nameInput).toHaveAttribute('required', '');
 
   // Page should still be on registration (no navigation, no success)
-  await expect(page).toHaveURL(new RegExp(`/camps/${camp.id}/register`));
+  await expect(page).toHaveURL(new RegExp(`/camps/${camp.slug}/register`));
   await expect(page.locator('.registration-success')).not.toBeVisible();
 });
 
 test('successful Stripe payment', async ({ page }) => {
-  await page.goto(`/camps/${camp.id}/register`);
+  await page.goto(`/camps/${camp.slug}/register`);
   await expect(page.getByRole('heading', { name: `Register for ${camp.name}` })).toBeVisible();
 
   await fillAthleteForm(page);
@@ -67,7 +67,7 @@ test('successful Stripe payment', async ({ page }) => {
 });
 
 test('declined card shows error', async ({ page }) => {
-  await page.goto(`/camps/${camp.id}/register`);
+  await page.goto(`/camps/${camp.slug}/register`);
   await expect(page.getByRole('heading', { name: `Register for ${camp.name}` })).toBeVisible();
 
   await fillAthleteForm(page);

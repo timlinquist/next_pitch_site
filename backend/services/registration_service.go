@@ -50,6 +50,10 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 		return nil, fmt.Errorf("failed to fetch age groups: %w", err)
 	}
 
+	var priceCents int
+	if camp.PriceCents != nil {
+		priceCents = *camp.PriceCents
+	}
 	if len(ageGroups) > 0 {
 		var matched *models.CampAgeGroup
 		for _, g := range ageGroups {
@@ -68,6 +72,7 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 		if count >= matched.MaxCapacity {
 			return nil, errors.New("age group is at full capacity")
 		}
+		priceCents = matched.PriceCents
 	} else if camp.MaxCapacity != nil {
 		count, err := s.campService.GetCampRegistrationCount(campID)
 		if err != nil {
@@ -113,7 +118,7 @@ func (s *RegistrationService) CreateAthleteAndRegistration(athlete *models.Athle
 		CampID:        campID,
 		PaymentStatus: models.PaymentStatusPending,
 		PaymentMethod: paymentMethod,
-		AmountCents:   camp.PriceCents,
+		AmountCents:   priceCents,
 		ParentEmail:   athlete.ParentEmail,
 	}
 

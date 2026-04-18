@@ -10,6 +10,7 @@ type CampAgeGroup struct {
 	MinAge      int       `json:"min_age" binding:"required"`
 	MaxAge      int       `json:"max_age" binding:"required"`
 	MaxCapacity int       `json:"max_capacity" binding:"required"`
+	PriceCents  int       `json:"price_cents" binding:"required"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: dev\:start dev\:stop migrate backend frontend test test-backend test-frontend build
+.PHONY: dev\:start dev\:stop migrate backend frontend test test-backend test-frontend test-e2e test-all build
 
 NVM_INIT := export NVM_DIR="$$HOME/.nvm" && . "$$NVM_DIR/nvm.sh"
 
@@ -44,6 +44,11 @@ test-backend:
 
 test-frontend:
 	$(NVM_INIT) && cd frontend && npm run test
+
+test-e2e:
+	$(NVM_INIT) && cd frontend && npm run test:e2e
+
+test-all: test-backend test-frontend test-e2e
 
 build:
 	cd backend && go build ./...

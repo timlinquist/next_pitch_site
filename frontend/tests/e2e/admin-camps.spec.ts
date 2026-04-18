@@ -46,22 +46,23 @@ test('admin creates a camp with age range capacity', async ({ page }) => {
   await page.locator('#camp-desc').fill('Camp with age groups');
   await page.locator('#camp-start').fill('2026-09-01');
   await page.locator('#camp-end').fill('2026-09-03');
-  await page.locator('#camp-price').fill('10000');
 
-  // Switch to age range mode
+  // Switch to age range mode (price is per-group, not camp-level)
   await page.getByLabel('Age Range').check();
 
-  // Add age groups
+  // Add age groups with prices
   await page.getByRole('button', { name: 'Add Age Group' }).click();
   const rows = page.locator('.age-group-row');
   await rows.nth(0).locator('input').nth(0).fill('8');
   await rows.nth(0).locator('input').nth(1).fill('10');
   await rows.nth(0).locator('input').nth(2).fill('10');
+  await rows.nth(0).locator('input').nth(3).fill('7500');
 
   await page.getByRole('button', { name: 'Add Age Group' }).click();
   await rows.nth(1).locator('input').nth(0).fill('11');
   await rows.nth(1).locator('input').nth(1).fill('13');
   await rows.nth(1).locator('input').nth(2).fill('10');
+  await rows.nth(1).locator('input').nth(3).fill('10000');
 
   await page.getByRole('button', { name: 'Create' }).click();
 
