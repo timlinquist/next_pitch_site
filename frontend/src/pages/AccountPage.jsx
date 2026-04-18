@@ -75,7 +75,7 @@ const AccountPage = () => {
                         top: '1rem',
                         right: '1rem',
                     }}
-                    onClick={() => logout({  })}
+                    onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
                 >
                     Logout
                 </button>
