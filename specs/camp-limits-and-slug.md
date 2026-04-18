@@ -1,29 +1,24 @@
-# Camp Slug URLs + Age-Range Capacity Limits
+# Camp Slug URLs + Age-Range Capacity & Pricing
 
-## What this builds
+## Overview
 
-Two features on the existing camp system:
+Two capacity modes per camp:
+- **Simple**: single `max_capacity` + single `price_cents` on the camp
+- **Age-range**: per-age-group rows, each with its own `max_capacity` and `price_cents`. Camp-level `price_cents` is null.
 
-1. **Slug-based URLs** — camps get a URL slug (e.g., camp "ELL" → `/camps/ell`). Admin sets slug when creating/editing; auto-generated from name, editable. Public registration pages use slug instead of numeric ID.
-
-2. **Age-range capacity limits** — two mutually exclusive capacity modes per camp:
-   - **Simple mode** (existing): single `max_capacity` for the whole camp
-   - **Age-range mode**: per-age-group limits (e.g., ages 8-10: 10 spots, ages 11-13: 10 spots). Athlete's age must fall in a defined group to register. Each group enforces its own capacity independently.
+Camps use URL slugs (auto-generated from name, editable) instead of numeric IDs in public routes.
 
 ## Schema
 
-Migrations continue existing numbering (latest is `000010`). Reuse `update_updated_at_column()` trigger.
-
-**Migration 000011** — add slug to camps:
+**Migration 000011** — slug on camps:
 ```sql
 ALTER TABLE camps ADD COLUMN slug VARCHAR(255);
 CREATE UNIQUE INDEX idx_camps_slug ON camps(slug);
 ```
-Nullable so existing rows aren't broken. App enforces on create/update.
 
 **Migration 000012** — age groups table:
 ```sql
-CREATE TABLE IF NOT EXISTS camp_age_groups (
+CREATE TABLE camp_age_groups (
     id SERIAL PRIMARY KEY,
     camp_id INTEGER NOT NULL REFERENCES camps(id) ON DELETE CASCADE,
     min_age INTEGER NOT NULL,
@@ -36,151 +31,109 @@ CREATE TABLE IF NOT EXISTS camp_age_groups (
 );
 CREATE INDEX idx_camp_age_groups_camp_id ON camp_age_groups(camp_id);
 ```
-Presence of rows in this table for a camp = age-range mode. No rows = simple mode (uses existing `max_capacity` on camps table).
 
-Write down migrations for both.
+**Migration 000013** — price on age groups, nullable price on camps:
+```sql
+ALTER TABLE camp_age_groups ADD COLUMN price_cents INTEGER NOT NULL;
+ALTER TABLE camp_age_groups ADD CONSTRAINT chk_price_cents_positive CHECK (price_cents > 0);
+ALTER TABLE camps ALTER COLUMN price_cents DROP NOT NULL;
+```
+
+Presence of `camp_age_groups` rows = age-range mode. No rows = simple mode.
 
 ## Backend
 
-Go/Gin. Raw SQL via `database/sql`. Follow existing patterns in `services/camp_service.go` and `controllers/camp_controller.go`.
+Go/Gin, raw SQL via `database/sql`.
 
 ### Models
 
-**`models/camp.go`** — add field:
-```go
-Slug *string `json:"slug"`
-```
+`Camp.PriceCents` is `*int` (nullable). `Camp.Slug` is `*string`.
 
-**`models/camp_age_group.go`** (new file):
-```go
-type CampAgeGroup struct {
-    ID          int       `json:"id"`
-    CampID      int       `json:"camp_id"`
-    MinAge      int       `json:"min_age" binding:"required"`
-    MaxAge      int       `json:"max_age" binding:"required"`
-    MaxCapacity int       `json:"max_capacity" binding:"required"`
-    CreatedAt   time.Time `json:"created_at"`
-    UpdatedAt   time.Time `json:"updated_at"`
-}
-```
+`CampAgeGroup` has: `ID`, `CampID`, `MinAge`, `MaxAge`, `MaxCapacity`, `PriceCents` (all `int`), `CreatedAt`, `UpdatedAt`.
 
-### Service changes (`services/camp_service.go`)
+### Camp service
 
-All existing SELECT/INSERT/UPDATE queries must add `slug` column + `&camp.Slug` in Scan calls. Affected methods: `GetActiveCamps`, `GetAllCamps`, `GetCampByID`, `CreateCamp`, `UpdateCamp`.
+All camp queries include `slug` column. Additional methods:
+- `GetCampBySlug(slug)` — `WHERE slug = $1`
+- `GenerateSlug(name)` — lowercase, non-alphanumeric → hyphens, trim
+- `GetAgeGroupsByCampID(campID)` — SELECT including `price_cents`, ordered by `min_age`
+- `SetAgeGroups(campID, groups)` — transaction: DELETE then INSERT (includes `price_cents`)
+- `ValidateAgeGroups(groups)` — sort by `min_age`, reject pairwise overlap
+- `GetAgeGroupRegistrationCount(campID, minAge, maxAge)` — count via JOIN athletes WHERE age BETWEEN
 
-New methods:
-- `GetCampBySlug(slug string) (*Camp, error)` — like `GetCampByID` but `WHERE slug = $1`
-- `GenerateSlug(name string) string` — lowercase, replace non-alphanumeric with hyphens, collapse multiples, trim edges
-- `GetAgeGroupsByCampID(campID int) ([]CampAgeGroup, error)` — SELECT ordered by min_age
-- `SetAgeGroups(campID int, groups []CampAgeGroup) error` — transaction: DELETE existing for camp, INSERT new ones
-- `ValidateAgeGroups(groups []CampAgeGroup) error` — sort by min_age, check pairwise overlap (`groups[i].min_age <= groups[i-1].max_age` = overlap)
-- `GetAgeGroupRegistrationCount(campID, minAge, maxAge int) (int, error)` — count registrations joining athletes where `age BETWEEN minAge AND maxAge` and `payment_status IN ('pending','paid')`
+`CreateCamp` auto-generates slug from name if not provided.
 
-`CreateCamp`: auto-generate slug from name if not provided. INSERT includes slug.
-`UpdateCamp`: include slug in UPDATE SET clause.
+### Registration service
 
-### Registration capacity check (`services/registration_service.go`)
-
-`CreateAthleteAndRegistration` (line 47-56) currently only checks flat `max_capacity`. Replace with:
-
+`CreateAthleteAndRegistration` capacity + pricing logic:
 1. Fetch age groups for camp
-2. If age groups exist → find group matching `athlete.Age`. No match → reject. Match found → check per-group count via `GetAgeGroupRegistrationCount`. Full → reject.
-3. Else if `max_capacity` set → existing flat check
-4. Else → unlimited
+2. If age groups exist → match by `athlete.Age`. No match → reject. Match → check per-group count. Full → reject. **Use matched group's `PriceCents`** for the registration.
+3. Else → use camp-level `PriceCents` and flat `max_capacity` check
+4. Snapshot price into `registration.AmountCents`
 
-### Controller changes (`controllers/camp_controller.go`)
+### Controller
 
-New response types:
-```go
-type AgeGroupWithSpots struct {
-    models.CampAgeGroup
-    RegisteredCount int `json:"registered_count"`
-    SpotsRemaining  int `json:"spots_remaining"`
-}
+Response wraps camps with computed availability:
+- `CampWithSpots`: camp + `registered_count` + `spots_remaining` (nil when age-range) + `age_groups` array
+- `AgeGroupWithSpots`: group + `registered_count` + `spots_remaining` + `price_cents`
 
-type CampWithSpots struct {
-    models.Camp
-    RegisteredCount int                 `json:"registered_count"`
-    SpotsRemaining  *int               `json:"spots_remaining"`
-    AgeGroups       []AgeGroupWithSpots `json:"age_groups,omitempty"`
-}
+Create/Update accept `age_groups []CampAgeGroup`. Mutually exclusive: age groups + `max_capacity` both set → 400. Age-range mode nulls `max_capacity`.
+
+### Routes
+
+```
+GET  /api/camps/by-slug/:slug  (public, before :id route)
 ```
 
-`GetActiveCamps` / `GetCampByID`: for each camp, fetch age groups. If groups exist, compute per-group counts; top-level `spots_remaining` becomes nil.
-
-`GetCampBySlug` (new): same as `GetCampByID` but takes slug param.
-
-`CreateCamp` / `UpdateCamp`: accept request struct with optional `age_groups []CampAgeGroup`. Modes are mutually exclusive — if age groups provided, clear max_capacity; if both set, return 400. Validate groups (no overlaps) then call `SetAgeGroups`.
-
-### Routes (`main.go`)
-
-Add public route:
-```go
-r.GET("/api/camps/by-slug/:slug", campController.GetCampBySlug)
-```
-Keep `/api/camps/:id` for admin use. Separate path avoids Gin ambiguity between numeric ID and string slug.
+All other existing camp routes unchanged.
 
 ## Frontend
 
-React + Vite SPA. Follow existing patterns.
+### Routing
 
-### Routes (`src/App.jsx`)
+`/camps/:slug/register` (was `:campId`). Fetch via `camps/by-slug/${slug}`.
 
-Change: `<Route path="/camps/:campId/register" ...>` → `<Route path="/camps/:slug/register" ...>`
+### CampsPage
 
-### CampsPage (`src/pages/CampsPage.jsx`)
+- Links use `camp.slug`
+- Age-range camps: show per-group line with price + spots (e.g. "Ages 8-10: $75.00 — 5 spots remaining")
+- Simple camps: show single price + spots
+- Full = all groups full OR flat `spots_remaining === 0`
 
-- Links change from `/camps/${camp.id}/register` to `/camps/${camp.slug}/register`
-- When camp has `age_groups`, show per-group spots instead of single `spots_remaining`
-- Disable Register Now if all groups full
+### CampRegistrationPage
 
-### CampRegistrationPage (`src/pages/CampRegistrationPage.jsx`)
+- `useParams()` extracts `{ slug }`
+- `getMatchedAgeGroup()` finds group by athlete age
+- `getDisplayPrice()` returns matched group's `price_cents` or camp's
+- Camp info banner: per-group prices + availability, or single price
+- Age input feedback: shows matched group price + spots, or "not eligible"
+- Stripe pay button + success page use `getDisplayPrice()`
 
-- `useParams()`: `{ campId }` → `{ slug }`
-- Fetch: `camps/${campId}` → `camps/by-slug/${slug}`
-- When age_groups present: show per-group availability in camp info banner
-- After athlete enters age: inline feedback showing which group they're in and spots remaining, or "age not eligible"
+### AdminCampsPage
 
-### AdminCampsPage (`src/pages/AdminCampsPage.jsx`)
-
-Form additions:
-- **Slug field** below name — auto-generates from name on change (lowercase, hyphens), admin can override
-- **Capacity mode toggle** (radio): "Simple" vs "Age Range"
-  - Simple: existing max_capacity input
-  - Age Range: hides max_capacity, shows dynamic row editor
-- **Age group editor** (visible in Age Range mode):
-  - Each row: min_age (number), max_age (number), max_capacity (number), remove button
-  - "Add Age Group" button
-  - Client-side overlap validation before submit
-
-Form state additions: `slug`, `capacity_mode` ('simple'|'age_range'), `age_groups` array.
-
-Payload: in age_range mode send `age_groups` and null `max_capacity`. In simple mode send empty `age_groups` (clears existing).
-
-Edit: detect mode from response — if `age_groups` has entries, set age_range mode.
-
-Camp list: show slug next to name, show per-group capacity when applicable.
-
-### CSS (`src/styles/camps.css`)
-
-Add styles for: `.capacity-mode-toggle`, `.age-group-editor`, `.age-group-row`, `.age-group-spots`, `.slug-field`
+- Slug field: auto-generates from name, editable
+- Capacity mode radio: Simple / Age Range
+- **Simple mode**: price input (dollars, `step="0.01"`) + max capacity
+- **Age-range mode**: dynamic row editor — each row: min age, max age, capacity, price (dollars). "Add Age Group" button.
+- **Dollar ↔ cents conversion**: form displays/accepts dollars. On submit: `Math.round(parseFloat(price) * 100)`. On edit load: `price_cents / 100`.
+- Payload: age-range sends `age_groups` with `price_cents` + null camp `price_cents`. Simple sends camp `price_cents` + empty `age_groups`.
+- Client-side overlap validation before submit.
+- Camp list: shows per-group info (price + registered/capacity) or single price.
 
 ## E2E Tests
 
-- `tests/e2e/helpers/db.ts`: add `slug` to `seedTestCamp` INSERT + `TestCamp` type, add `seedTestCampAgeGroups` helper
-- `tests/e2e/camps-listing.spec.ts`: update URL assertions to use slug
-- `tests/e2e/admin-camps.spec.ts`: update create test for slug, add test for age-range mode
+- `helpers/db.ts`: `TestCamp` includes `slug`. `seedTestCamp` generates slug. `seedTestCampAgeGroups` accepts `price_cents`.
+- `camps-listing.spec.ts`: URL assertions use slug
+- `admin-camps.spec.ts`: simple camp test fills dollar price. Age-range test fills per-group dollar prices.
+- `stripe-registration.spec.ts`: URLs use `camp.slug`
 
 ## Verification
 
-1. Migrations apply: `cd backend && go run cmd/migrate/main.go -action up`
-2. Backend tests: `cd backend && go test ./...`
-3. Admin: create camp → slug auto-generates and is editable
-4. Admin: create camp with age groups → overlapping ranges rejected client + server side
-5. Public: `/camps` shows slug-based links
-6. Public: `/camps/ell/register` loads correct camp
-7. Registration: athlete in valid age group → succeeds
-8. Registration: athlete age outside all groups → rejected
-9. Registration: age group at capacity → rejected
-10. Simple mode camps still work as before
-11. E2E tests: `cd frontend && npm run test:e2e`
+Run `make test-all` (backend unit + frontend unit + E2E). The E2E suite covers:
+1. Admin creates simple camp (slug auto-generates, dollar price)
+2. Admin creates age-range camp (per-group prices in dollars)
+3. Admin views registrations
+4. Public camp listing shows slug-based links
+5. Registration navigates via slug
+6. Stripe payment flow end-to-end
+7. Declined card error handling
