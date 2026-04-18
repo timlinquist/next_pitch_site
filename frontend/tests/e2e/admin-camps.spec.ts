@@ -19,7 +19,7 @@ test('admin creates a camp', async ({ page }) => {
   await page.locator('#camp-desc').fill('Created by admin E2E test');
   await page.locator('#camp-start').fill('2026-08-01');
   await page.locator('#camp-end').fill('2026-08-03');
-  await page.locator('#camp-price').fill('7500');
+  await page.locator('#camp-price').fill('75');
   await page.locator('#camp-cap').fill('15');
 
   // Verify slug auto-generated
@@ -56,13 +56,13 @@ test('admin creates a camp with age range capacity', async ({ page }) => {
   await rows.nth(0).locator('input').nth(0).fill('8');
   await rows.nth(0).locator('input').nth(1).fill('10');
   await rows.nth(0).locator('input').nth(2).fill('10');
-  await rows.nth(0).locator('input').nth(3).fill('7500');
+  await rows.nth(0).locator('input').nth(3).fill('75');
 
   await page.getByRole('button', { name: 'Add Age Group' }).click();
   await rows.nth(1).locator('input').nth(0).fill('11');
   await rows.nth(1).locator('input').nth(1).fill('13');
   await rows.nth(1).locator('input').nth(2).fill('10');
-  await rows.nth(1).locator('input').nth(3).fill('10000');
+  await rows.nth(1).locator('input').nth(3).fill('100');
 
   await page.getByRole('button', { name: 'Create' }).click();
 

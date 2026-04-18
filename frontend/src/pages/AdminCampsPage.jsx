@@ -22,7 +22,7 @@ const AdminCampsPage = () => {
         description: '',
         start_date: '',
         end_date: '',
-        price_cents: '',
+        price: '',
         max_capacity: '',
         slug: '',
         capacity_mode: 'simple',
@@ -99,7 +99,7 @@ const AdminCampsPage = () => {
     const addAgeGroup = () => {
         setFormData({
             ...formData,
-            age_groups: [...formData.age_groups, { min_age: '', max_age: '', max_capacity: '', price_cents: '' }],
+            age_groups: [...formData.age_groups, { min_age: '', max_age: '', max_capacity: '', price: '' }],
         });
     };
 
@@ -110,14 +110,14 @@ const AdminCampsPage = () => {
 
     const validateAgeGroups = () => {
         const groups = formData.age_groups
-            .map(g => ({ min_age: parseInt(g.min_age), max_age: parseInt(g.max_age), max_capacity: parseInt(g.max_capacity), price_cents: parseInt(g.price_cents) }))
+            .map(g => ({ min_age: parseInt(g.min_age), max_age: parseInt(g.max_age), max_capacity: parseInt(g.max_capacity), price: parseFloat(g.price) }))
             .sort((a, b) => a.min_age - b.min_age);
 
         for (let i = 0; i < groups.length; i++) {
-            if (isNaN(groups[i].min_age) || isNaN(groups[i].max_age) || isNaN(groups[i].max_capacity) || isNaN(groups[i].price_cents)) {
+            if (isNaN(groups[i].min_age) || isNaN(groups[i].max_age) || isNaN(groups[i].max_capacity) || isNaN(groups[i].price)) {
                 return 'All age group fields are required';
             }
-            if (groups[i].price_cents <= 0) {
+            if (groups[i].price <= 0) {
                 return 'Price must be greater than 0';
             }
             if (groups[i].min_age > groups[i].max_age) {
@@ -134,7 +134,7 @@ const AdminCampsPage = () => {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', description: '', start_date: '', end_date: '', price_cents: '', max_capacity: '', slug: '', capacity_mode: 'simple', age_groups: [] });
+        setFormData({ name: '', description: '', start_date: '', end_date: '', price: '', max_capacity: '', slug: '', capacity_mode: 'simple', age_groups: [] });
         setEditingCamp(null);
         setShowForm(false);
     };
@@ -162,7 +162,7 @@ const AdminCampsPage = () => {
                 description: formData.description,
                 start_date: formData.start_date + 'T00:00:00Z',
                 end_date: formData.end_date + 'T00:00:00Z',
-                price_cents: formData.capacity_mode === 'simple' ? parseInt(formData.price_cents) : null,
+                price_cents: formData.capacity_mode === 'simple' ? Math.round(parseFloat(formData.price) * 100) : null,
                 slug: formData.slug || null,
                 max_capacity: formData.capacity_mode === 'simple' && formData.max_capacity
                     ? parseInt(formData.max_capacity)
@@ -172,7 +172,7 @@ const AdminCampsPage = () => {
                         min_age: parseInt(g.min_age),
                         max_age: parseInt(g.max_age),
                         max_capacity: parseInt(g.max_capacity),
-                        price_cents: parseInt(g.price_cents),
+                        price_cents: Math.round(parseFloat(g.price) * 100),
                     }))
                     : [],
             };
@@ -209,7 +209,7 @@ const AdminCampsPage = () => {
             description: camp.description || '',
             start_date: camp.start_date.split('T')[0],
             end_date: camp.end_date.split('T')[0],
-            price_cents: camp.price_cents ? String(camp.price_cents) : '',
+            price: camp.price_cents ? String(camp.price_cents / 100) : '',
             max_capacity: camp.max_capacity ? String(camp.max_capacity) : '',
             slug: camp.slug || '',
             capacity_mode: hasAgeGroups ? 'age_range' : 'simple',
@@ -218,7 +218,7 @@ const AdminCampsPage = () => {
                     min_age: String(g.min_age),
                     max_age: String(g.max_age),
                     max_capacity: String(g.max_capacity),
-                    price_cents: String(g.price_cents),
+                    price: String(g.price_cents / 100),
                 }))
                 : [],
         });
@@ -332,8 +332,8 @@ const AdminCampsPage = () => {
                         {formData.capacity_mode === 'simple' ? (
                             <>
                                 <div className="form-group">
-                                    <label htmlFor="camp-price">Price (cents)</label>
-                                    <input type="number" id="camp-price" name="price_cents" value={formData.price_cents} onChange={handleFormChange} required min="1" />
+                                    <label htmlFor="camp-price">Price ($)</label>
+                                    <input type="number" id="camp-price" name="price" value={formData.price} onChange={handleFormChange} required min="0.01" step="0.01" />
                                 </div>
                                 <div className="form-group">
                                     <label htmlFor="camp-cap">Max Capacity</label>
@@ -371,10 +371,11 @@ const AdminCampsPage = () => {
                                         />
                                         <input
                                             type="number"
-                                            placeholder="Price (cents)"
-                                            value={group.price_cents}
-                                            onChange={(e) => handleAgeGroupChange(index, 'price_cents', e.target.value)}
-                                            min="1"
+                                            placeholder="Price ($)"
+                                            value={group.price}
+                                            onChange={(e) => handleAgeGroupChange(index, 'price', e.target.value)}
+                                            min="0.01"
+                                            step="0.01"
                                             required
                                         />
                                         <button type="button" className="btn btn-small btn-danger" onClick={() => removeAgeGroup(index)}>Remove</button>
