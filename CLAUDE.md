@@ -17,11 +17,13 @@ gh auth setup-git && git -c url."https://github.com/".insteadOf="git@github-pers
 
 ## Node / nvm
 
-Node is managed via nvm. The Bash tool doesn't source `.zshrc`, so prefix npm/node commands with:
+Node is managed via nvm. The Makefile resolves nvm's Node path automatically, so all `make` targets just work. For direct `npm`/`node` commands outside of make, prefix with:
 
 ```sh
 export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && <command>
 ```
+
+Prefer `make` targets over raw npm commands when one exists.
 
 ## Development
 

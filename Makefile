@@ -1,13 +1,15 @@
 SHELL := /bin/bash
 .PHONY: dev\:start dev\:stop migrate backend frontend test test-backend test-frontend test-e2e test-all build
 
-NVM_INIT := export NVM_DIR="$$HOME/.nvm" && . "$$NVM_DIR/nvm.sh"
+# Resolve nvm-managed Node once; every recipe inherits this PATH
+NVM_BIN := $(shell . "$$HOME/.nvm/nvm.sh" && echo "$$NVM_BIN")
+export PATH := $(NVM_BIN):$(PATH)
 
 dev\:start: migrate
 	@echo "Starting backend and frontend..."
 	@trap 'kill 0' EXIT; \
 	(cd backend && go run .) & \
-	($(NVM_INIT) && cd frontend && npm run dev) & \
+	(cd frontend && npm run dev) & \
 	wait
 
 dev\:stop:
@@ -35,7 +37,7 @@ backend:
 	cd backend && go run .
 
 frontend:
-	$(NVM_INIT) && cd frontend && npm run dev
+	cd frontend && npm run dev
 
 test: test-backend test-frontend
 
@@ -43,13 +45,13 @@ test-backend:
 	cd backend && go test ./...
 
 test-frontend:
-	$(NVM_INIT) && cd frontend && npm run test
+	cd frontend && npm run test
 
 test-e2e:
-	$(NVM_INIT) && cd frontend && npm run test:e2e
+	cd frontend && npm run test:e2e
 
 test-all: test-backend test-frontend test-e2e
 
 build:
 	cd backend && go build ./...
-	$(NVM_INIT) && cd frontend && npm run build
+	cd frontend && npm run build
