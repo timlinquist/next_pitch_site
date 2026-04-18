@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { Auth0Provider as Auth0ReactProvider } from '@auth0/auth0-react'
 import { BrowserRouter, useNavigate } from 'react-router-dom'
+import { Auth0ContextProvider } from './contexts/Auth0Context'
 import App from './App.jsx'
 import './styles/common.css'
 
@@ -39,7 +40,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <Auth0ProviderWithNavigate>
-        <App />
+        <Auth0ContextProvider>
+          <App />
+        </Auth0ContextProvider>
       </Auth0ProviderWithNavigate>
     </BrowserRouter>
   </React.StrictMode>,

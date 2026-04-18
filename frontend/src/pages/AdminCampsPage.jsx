@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth0Context } from '../contexts/Auth0Context';
 import { getApiUrl } from '../utils/api';
 import '../styles/camps.css';
 
@@ -9,11 +10,11 @@ const generateSlug = (name) => {
 
 const AdminCampsPage = () => {
     const { getAccessTokenSilently, user } = useAuth0();
+    const { isAdmin, userLoading } = useAuth0Context();
     const [camps, setCamps] = useState([]);
     const [registrations, setRegistrations] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [isAdmin, setIsAdmin] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editingCamp, setEditingCamp] = useState(null);
     const [expandedCamp, setExpandedCamp] = useState(null);
@@ -30,29 +31,13 @@ const AdminCampsPage = () => {
     });
 
     useEffect(() => {
-        checkAdminAndFetch();
-    }, []);
-
-    const checkAdminAndFetch = async () => {
-        try {
-            const token = await getAccessTokenSilently();
-            const userRes = await fetch(getApiUrl('users/me'), {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const userData = await userRes.json();
-            if (!userData.is_admin) {
-                setIsAdmin(false);
-                setLoading(false);
-                return;
-            }
-            setIsAdmin(true);
-            await fetchCamps();
-        } catch (err) {
-            setError('Failed to verify admin status.');
-        } finally {
+        if (userLoading) return;
+        if (isAdmin) {
+            fetchCamps().finally(() => setLoading(false));
+        } else {
             setLoading(false);
         }
-    };
+    }, [isAdmin, userLoading]);
 
     const fetchCamps = async () => {
         try {

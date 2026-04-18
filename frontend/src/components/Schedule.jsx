@@ -5,6 +5,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useLocation } from 'react-router-dom';
+import { useAuth0Context } from '../contexts/Auth0Context';
 import EventModal from './EventModal';
 import EventDetailsModal from './EventDetailsModal';
 import AuthRequired from './AuthRequired';
@@ -56,6 +57,7 @@ const MAX_NON_ADMIN_DURATION = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
 const Schedule = () => {
     const { user, getAccessTokenSilently } = useAuth0();
+    const { isAdmin } = useAuth0Context();
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -64,40 +66,12 @@ const Schedule = () => {
     const [selectedSlot, setSelectedSlot] = useState(null);
     const [selectedEvent, setSelectedEvent] = useState(null);
     const [deleteError, setDeleteError] = useState(null);
-    const [isAdmin, setIsAdmin] = useState(false);
     const location = useLocation();
     const [initialEventData, setInitialEventData] = useState(null);
     const [viewDates, setViewDates] = useState({ start: null, end: null });
 
-    const checkAdminStatus = async () => {
-        try {
-            const token = await getAccessTokenSilently();
-            console.log('[Schedule] Got access token:', token);
-            
-            const response = await fetch(getApiUrl('users/me'), {
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (response.ok) {
-                const userData = await response.json();
-                setIsAdmin(userData.is_admin);
-            } else {
-                console.error('Failed to fetch user admin status:', response.status);
-                setIsAdmin(false);
-            }
-        } catch (error) {
-            console.error('Error checking admin status:', error);
-            setIsAdmin(false);
-        }
-    };
-
     useEffect(() => {
         if (user) {
-            checkAdminStatus();
             fetchScheduleEntries();
         } else {
             setLoading(false);
