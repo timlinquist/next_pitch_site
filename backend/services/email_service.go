@@ -24,6 +24,8 @@ type EmailServiceInterface interface {
 	SendContactEmail(form models.ContactForm) error
 	SendAppointmentCancellationEmail(entry *models.ScheduleEntry) error
 	SendAppointmentConfirmationEmail(entry *models.ScheduleEntry) error
+	SendCampRegistrationConfirmation(reg *models.CampRegistration, athlete *models.Athlete, camp *models.Camp)
+	SendAdminCampRegistrationNotification(reg *models.CampRegistration, athlete *models.Athlete, camp *models.Camp)
 	QueueEmail(data EmailData)
 }
 
@@ -37,6 +39,8 @@ func (e EmailType) String() string {
 		"EmailTypeAdminConfirmation",
 		"EmailTypeContact",
 		"EmailTypeVideoUpload",
+		"EmailTypeCampRegistration",
+		"EmailTypeAdminCampRegistration",
 	}[e]
 }
 
@@ -47,6 +51,8 @@ const (
 	EmailTypeAdminConfirmation
 	EmailTypeContact
 	EmailTypeVideoUpload
+	EmailTypeCampRegistration
+	EmailTypeAdminCampRegistration
 )
 
 type EmailData struct {
@@ -90,12 +96,14 @@ func NewEmailService() *EmailService {
 
 	// Load templates
 	templateFiles := map[string]string{
-		"cancellation":       "cancellation.html",
-		"confirmation":       "confirmation.html",
-		"admin_cancellation": "admin_cancellation.html",
-		"admin_confirmation": "admin_confirmation.html",
-		"contact":            "contact.html",
-		"video_upload":       "video_upload.html",
+		"cancellation":              "cancellation.html",
+		"confirmation":              "confirmation.html",
+		"admin_cancellation":        "admin_cancellation.html",
+		"admin_confirmation":        "admin_confirmation.html",
+		"contact":                   "contact.html",
+		"video_upload":              "video_upload.html",
+		"camp_registration":         "camp_registration_confirmation.html",
+		"admin_camp_registration":   "admin_camp_registration.html",
 	}
 
 	// Set template directory path (relative to working directory, which is backend/)
@@ -247,6 +255,51 @@ func (s *EmailService) SendAppointmentConfirmationEmail(entry *models.ScheduleEn
 
 	log.Printf("[Email] Successfully queued confirmation emails for appointment %d", entry.ID)
 	return nil
+}
+
+type CampRegistrationEmailData struct {
+	Athlete  *models.Athlete
+	Camp     *models.Camp
+	Amount   string
+	RegTime  time.Time
+}
+
+func (s *EmailService) SendCampRegistrationConfirmation(reg *models.CampRegistration, athlete *models.Athlete, camp *models.Camp) {
+	log.Printf("[Email] Preparing to send camp registration confirmation for registration %d", reg.ID)
+
+	data := CampRegistrationEmailData{
+		Athlete: athlete,
+		Camp:    camp,
+		Amount:  fmt.Sprintf("$%.2f", reg.Amount),
+		RegTime: time.Now(),
+	}
+
+	s.QueueEmail(EmailData{
+		Type:     EmailTypeCampRegistration,
+		Data:     data,
+		To:       reg.ParentEmail,
+		Subject:  fmt.Sprintf("Camp Registration Confirmation - %s", camp.Name),
+		Template: "camp_registration",
+	})
+}
+
+func (s *EmailService) SendAdminCampRegistrationNotification(reg *models.CampRegistration, athlete *models.Athlete, camp *models.Camp) {
+	log.Printf("[Email] Preparing to send admin camp registration notification for registration %d", reg.ID)
+
+	data := CampRegistrationEmailData{
+		Athlete: athlete,
+		Camp:    camp,
+		Amount:  fmt.Sprintf("$%.2f", reg.Amount),
+		RegTime: time.Now(),
+	}
+
+	s.QueueEmail(EmailData{
+		Type:     EmailTypeAdminCampRegistration,
+		Data:     data,
+		To:       AdminEmail,
+		Subject:  fmt.Sprintf("New Camp Registration - %s: %s", camp.Name, athlete.Name),
+		Template: "admin_camp_registration",
+	})
 }
 
 func (s *EmailService) SendVideoUploadNotification(user *models.User, fileName string) error {

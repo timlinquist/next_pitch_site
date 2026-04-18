@@ -1,0 +1,10 @@
+<h2>Camp Registration Confirmation</h2>
+<p>Thank you for registering! Here are your registration details:</p>
+<ul>
+    <li><strong>Camp:</strong> {{.Camp.Name}}</li>
+    <li><strong>Dates:</strong> {{.Camp.StartDate.Format "January 2, 2006"}} - {{.Camp.EndDate.Format "January 2, 2006"}}</li>
+    <li><strong>Athlete:</strong> {{.Athlete.Name}}</li>
+    <li><strong>Age:</strong> {{.Athlete.Age}}</li>
+    <li><strong>Amount Paid:</strong> {{.Amount}}</li>
+</ul>
+<p>We look forward to seeing {{.Athlete.Name}} at camp! If you have any questions, please don't hesitate to reach out.</p>
