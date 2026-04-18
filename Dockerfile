@@ -9,6 +9,8 @@ COPY frontend/ ./
 # Build args for Vite env vars (baked into the JS bundle at build time)
 ARG VITE_AUTH0_CLIENT_DOMAIN
 ARG VITE_AUTH0_CLIENT_ID
+ARG VITE_STRIPE_PUBLISHABLE_KEY
+ARG VITE_PAYPAL_CLIENT_ID
 
 RUN npm run build
 
