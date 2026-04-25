@@ -41,6 +41,7 @@ export async function seedTestCamp(overrides: Partial<{
   price_cents: number;
   max_capacity: number | null;
   slug: string;
+  location_id: number | null;
 }> = {}): Promise<TestCamp> {
   const name = overrides.name || `${TEST_PREFIX} Camp ${Date.now()}`;
   const description = overrides.description || 'Automated test camp';
@@ -49,15 +50,44 @@ export async function seedTestCamp(overrides: Partial<{
   const priceCents = overrides.price_cents ?? 5000;
   const maxCapacity = overrides.max_capacity ?? 20;
   const slug = overrides.slug || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const locationId = overrides.location_id ?? null;
 
   const result = await db().query(
-    `INSERT INTO camps (name, description, start_date, end_date, price_cents, max_capacity, slug, is_active)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+    `INSERT INTO camps (name, description, start_date, end_date, price_cents, max_capacity, slug, is_active, location_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8)
      RETURNING id, name, price_cents, slug`,
-    [name, description, startDate, endDate, priceCents, maxCapacity, slug]
+    [name, description, startDate, endDate, priceCents, maxCapacity, slug, locationId]
   );
 
   return result.rows[0];
+}
+
+export async function seedTestLocation(overrides: Partial<{
+  venue_name: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+}> = {}): Promise<{ id: number }> {
+  const venue = overrides.venue_name ?? `${TEST_PREFIX} Venue ${Date.now()}`;
+  const street = overrides.street ?? `${Date.now()} Test St`;
+  const city = overrides.city ?? 'Testville';
+  const state = overrides.state ?? 'IL';
+  const zip = overrides.zip ?? '60000';
+
+  const res = await db().query(
+    `INSERT INTO locations (venue_name, street, city, state, zip)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (street, zip) DO UPDATE SET venue_name = EXCLUDED.venue_name
+     RETURNING id`,
+    [venue, street, city, state, zip]
+  );
+  return { id: res.rows[0].id };
+}
+
+export async function countLocations(): Promise<number> {
+  const r = await db().query(`SELECT COUNT(*)::int AS c FROM locations`);
+  return r.rows[0].c;
 }
 
 export async function seedTestCampAgeGroups(campId: number, groups: { min_age: number; max_age: number; max_capacity: number; price_cents: number }[]) {
@@ -98,6 +128,10 @@ export async function cleanupTestData() {
   );
   await db().query(
     `DELETE FROM camps WHERE name LIKE $1`,
+    [`${TEST_PREFIX}%`]
+  );
+  await db().query(
+    `DELETE FROM locations WHERE venue_name LIKE $1`,
     [`${TEST_PREFIX}%`]
   );
 }
