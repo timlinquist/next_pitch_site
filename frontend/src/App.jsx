@@ -11,6 +11,7 @@ import MechanicalAnalysisPage from './pages/MechanicalAnalysisPage.jsx'
 import AccountPage from './pages/AccountPage.jsx'
 import CampsPage from './pages/CampsPage.jsx'
 import CampRegistrationPage from './pages/CampRegistrationPage.jsx'
+import CampDetailPage from './pages/CampDetailPage'
 import AdminCampsPage from './pages/AdminCampsPage.jsx'
 import './styles/nav.css'
 import './styles/common.css'
@@ -59,6 +60,7 @@ function App() {
         <Route path="/schedule" element={<Schedule />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/camps" element={<CampsPage />} />
+        <Route path="/camps/:slug" element={<CampDetailPage />} />
         <Route path="/camps/:slug/register" element={<CampRegistrationPage />} />
         <Route path="/admin/camps" element={
           <ProtectedRoute>
