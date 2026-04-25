@@ -56,6 +56,7 @@ func main() {
 	userController := controllers.NewUserController(userService)
 	campController := controllers.NewCampController(campService, locationService, userService)
 	registrationController := controllers.NewRegistrationController(registrationService, campService, emailService, userService)
+	locationController := controllers.NewLocationController(locationService, userService)
 
 	videoController, err := controllers.NewVideoController(db.DB, userService, emailService)
 	if err != nil {
@@ -90,6 +91,7 @@ func main() {
 		protected.PUT("/camps/:id", campController.UpdateCamp)
 		protected.DELETE("/camps/:id", campController.DeactivateCamp)
 		protected.GET("/camps/:id/registrations", registrationController.GetCampRegistrations)
+		protected.GET("/locations", locationController.GetAll)
 	}
 
 	// Public routes
