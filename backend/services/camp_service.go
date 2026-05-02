@@ -39,6 +39,11 @@ func dollarsToCents(d *float64) *int {
 func scanCamp(scanner interface{ Scan(...any) error }) (models.Camp, error) {
 	var camp models.Camp
 	var priceCents *int
+	var loc models.Location
+	var locID sql.NullInt64
+	var locVenueName sql.NullString
+	var locStreet, locCity, locState, locZip, locCountry sql.NullString
+	var locCreatedAt, locUpdatedAt sql.NullTime
 	err := scanner.Scan(
 		&camp.ID,
 		&camp.Name,
@@ -49,20 +54,52 @@ func scanCamp(scanner interface{ Scan(...any) error }) (models.Camp, error) {
 		&camp.MaxCapacity,
 		&camp.Slug,
 		&camp.IsActive,
+		&camp.LocationID,
 		&camp.CreatedAt,
 		&camp.UpdatedAt,
+		&locID,
+		&locVenueName,
+		&locStreet,
+		&locCity,
+		&locState,
+		&locZip,
+		&locCountry,
+		&locCreatedAt,
+		&locUpdatedAt,
 	)
 	camp.Price = centsToDollars(priceCents)
+	if locID.Valid {
+		loc.ID = int(locID.Int64)
+		if locVenueName.Valid {
+			s := locVenueName.String
+			loc.VenueName = &s
+		}
+		loc.Street = locStreet.String
+		loc.City = locCity.String
+		loc.State = locState.String
+		loc.Zip = locZip.String
+		loc.Country = locCountry.String
+		if locCreatedAt.Valid {
+			loc.CreatedAt = locCreatedAt.Time
+		}
+		if locUpdatedAt.Valid {
+			loc.UpdatedAt = locUpdatedAt.Time
+		}
+		camp.Location = &loc
+	}
 	return camp, err
 }
 
 func (s *CampService) GetActiveCamps() ([]models.Camp, error) {
 	rows, err := s.db.Query(`
-		SELECT id, name, description, start_date, end_date, price_cents,
-		       max_capacity, slug, is_active, created_at, updated_at
-		FROM camps
-		WHERE is_active = true
-		ORDER BY start_date ASC
+		SELECT c.id, c.name, c.description, c.start_date, c.end_date, c.price_cents,
+		       c.max_capacity, c.slug, c.is_active, c.location_id, c.created_at, c.updated_at,
+		       l.id, l.venue_name, l.street, l.city, l.state, l.zip, l.country,
+		       l.created_at, l.updated_at
+		FROM camps c
+		LEFT JOIN locations l ON l.id = c.location_id
+		WHERE c.is_active = true
+		ORDER BY c.start_date ASC
 	`)
 	if err != nil {
 		return nil, err
@@ -83,10 +120,13 @@ func (s *CampService) GetActiveCamps() ([]models.Camp, error) {
 
 func (s *CampService) GetAllCamps() ([]models.Camp, error) {
 	rows, err := s.db.Query(`
-		SELECT id, name, description, start_date, end_date, price_cents,
-		       max_capacity, slug, is_active, created_at, updated_at
-		FROM camps
-		ORDER BY start_date ASC
+		SELECT c.id, c.name, c.description, c.start_date, c.end_date, c.price_cents,
+		       c.max_capacity, c.slug, c.is_active, c.location_id, c.created_at, c.updated_at,
+		       l.id, l.venue_name, l.street, l.city, l.state, l.zip, l.country,
+		       l.created_at, l.updated_at
+		FROM camps c
+		LEFT JOIN locations l ON l.id = c.location_id
+		ORDER BY c.start_date ASC
 	`)
 	if err != nil {
 		return nil, err
@@ -107,10 +147,13 @@ func (s *CampService) GetAllCamps() ([]models.Camp, error) {
 
 func (s *CampService) GetCampByID(id int) (*models.Camp, error) {
 	camp, err := scanCamp(s.db.QueryRow(`
-		SELECT id, name, description, start_date, end_date, price_cents,
-		       max_capacity, slug, is_active, created_at, updated_at
-		FROM camps
-		WHERE id = $1
+		SELECT c.id, c.name, c.description, c.start_date, c.end_date, c.price_cents,
+		       c.max_capacity, c.slug, c.is_active, c.location_id, c.created_at, c.updated_at,
+		       l.id, l.venue_name, l.street, l.city, l.state, l.zip, l.country,
+		       l.created_at, l.updated_at
+		FROM camps c
+		LEFT JOIN locations l ON l.id = c.location_id
+		WHERE c.id = $1
 	`, id))
 
 	if err == sql.ErrNoRows {
@@ -125,10 +168,13 @@ func (s *CampService) GetCampByID(id int) (*models.Camp, error) {
 
 func (s *CampService) GetCampBySlug(slug string) (*models.Camp, error) {
 	camp, err := scanCamp(s.db.QueryRow(`
-		SELECT id, name, description, start_date, end_date, price_cents,
-		       max_capacity, slug, is_active, created_at, updated_at
-		FROM camps
-		WHERE slug = $1
+		SELECT c.id, c.name, c.description, c.start_date, c.end_date, c.price_cents,
+		       c.max_capacity, c.slug, c.is_active, c.location_id, c.created_at, c.updated_at,
+		       l.id, l.venue_name, l.street, l.city, l.state, l.zip, l.country,
+		       l.created_at, l.updated_at
+		FROM camps c
+		LEFT JOIN locations l ON l.id = c.location_id
+		WHERE c.slug = $1
 	`, slug))
 
 	if err == sql.ErrNoRows {
@@ -158,8 +204,8 @@ func (s *CampService) CreateCamp(camp *models.Camp) error {
 
 	now := time.Now()
 	err := s.db.QueryRow(`
-		INSERT INTO camps (name, description, start_date, end_date, price_cents, max_capacity, slug, is_active, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+		INSERT INTO camps (name, description, start_date, end_date, price_cents, max_capacity, slug, is_active, location_id, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)
 		RETURNING id
 	`,
 		camp.Name,
@@ -170,6 +216,7 @@ func (s *CampService) CreateCamp(camp *models.Camp) error {
 		camp.MaxCapacity,
 		camp.Slug,
 		true,
+		camp.LocationID,
 		now,
 	).Scan(&camp.ID)
 
@@ -188,8 +235,8 @@ func (s *CampService) UpdateCamp(camp *models.Camp) error {
 	result, err := s.db.Exec(`
 		UPDATE camps
 		SET name = $1, description = $2, start_date = $3, end_date = $4,
-		    price_cents = $5, max_capacity = $6, slug = $7, updated_at = $8
-		WHERE id = $9
+		    price_cents = $5, max_capacity = $6, slug = $7, location_id = $8, updated_at = $9
+		WHERE id = $10
 	`,
 		camp.Name,
 		camp.Description,
@@ -198,6 +245,7 @@ func (s *CampService) UpdateCamp(camp *models.Camp) error {
 		dollarsToCents(camp.Price),
 		camp.MaxCapacity,
 		camp.Slug,
+		camp.LocationID,
 		now,
 		camp.ID,
 	)
