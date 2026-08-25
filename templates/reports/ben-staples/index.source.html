@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ben Staples - Mechanics Evaluation | THE NEXT PITCH</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --navy: #0e1c2f;
+      --navy-2: #162a45;
+      --slate: #6e8eb3;
+      --slate-bright: #8aa8c8;
+      --steel: #3d5570;
+      --ink: #142033;
+      --muted: #5a6b7d;
+      --paper: #f4f7fb;
+      --card: #ffffff;
+      --line: #d5e0ec;
+      --shadow: 0 18px 50px rgba(14, 28, 47, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Figtree", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(110, 142, 179, 0.22), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(47, 107, 79, 0.10), transparent 50%),
+        linear-gradient(180deg, #e8eef5 0%, var(--paper) 28%, #eef3f8 100%);
+      line-height: 1.55;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .sheet { width: min(960px, calc(100% - 2rem)); margin: 1.5rem auto 3rem; }
+    .letterhead {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 0.85rem 0 0.75rem; border-bottom: 3px solid var(--slate); margin-bottom: 1.25rem;
+    }
+    .brand-mark svg { width: min(340px, 70vw); height: auto; display: block; }
+    .brand-tag {
+      font-family: "Barlow Condensed", sans-serif; font-weight: 600; font-size: 0.78rem;
+      letter-spacing: 0.22em; text-transform: uppercase; color: var(--slate);
+    }
+    .letterhead-meta { text-align: right; font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+    .letterhead-meta strong { display: block; color: var(--navy); font-size: 0.9rem; letter-spacing: 0.04em; }
+    .page-foot {
+      display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+      margin-top: 1.5rem; padding-top: 0.75rem; border-top: 2px solid var(--slate);
+      font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em;
+    }
+    .page-foot .tagline {
+      text-transform: uppercase; font-family: "Barlow Condensed", sans-serif; font-weight: 600;
+      letter-spacing: 0.14em; color: var(--steel);
+    }
+    .page {
+      background: var(--card); border-radius: 22px; box-shadow: var(--shadow);
+      padding: 1.4rem 1.6rem 1.2rem; margin-bottom: 1.75rem; position: relative; overflow: hidden;
+    }
+    .page::before {
+      content: ""; position: absolute; inset: 0 auto 0 0; width: 6px;
+      background: linear-gradient(180deg, var(--slate), var(--navy));
+    }
+    .cover-hero {
+      display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 1.4rem;
+      align-items: stretch; margin-top: 0.5rem;
+    }
+    .cover-copy h1 {
+      font-family: "Barlow Condensed", sans-serif; font-weight: 800;
+      font-size: clamp(2.8rem, 7vw, 4.4rem); line-height: 0.92; letter-spacing: 0.02em;
+      text-transform: uppercase; color: var(--navy); margin: 0.2rem 0 0.6rem;
+    }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 0.85rem;
+      letter-spacing: 0.2em; text-transform: uppercase; color: var(--slate);
+    }
+    .eyebrow::before { content: ""; width: 1.4rem; height: 2px; background: var(--slate); }
+    .cover-lead { font-size: 1.05rem; color: var(--muted); max-width: 34ch; margin: 0 0 1.2rem; }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+    .stat {
+      background: linear-gradient(160deg, #f7fafc, #eef3f8); border: 1px solid var(--line);
+      border-radius: 12px; padding: 0.75rem 0.85rem;
+    }
+    .stat dt {
+      margin: 0; font-family: "Barlow Condensed", sans-serif; font-size: 0.72rem;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--slate);
+    }
+    .stat dd { margin: 0.15rem 0 0; font-weight: 700; font-size: 1.05rem; color: var(--navy); }
+    .cover-photo {
+      position: relative; border-radius: 18px; overflow: hidden; min-height: 360px;
+      background: var(--navy); box-shadow: 0 20px 40px rgba(14, 28, 47, 0.25);
+      align-self: stretch;
+    }
+    .cover-photo img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; object-position: center top; display: block;
+    }
+    .cover-photo .badge {
+      position: absolute; left: 1rem; bottom: 1rem; background: rgba(14, 28, 47, 0.82);
+      color: #fff; border: 1px solid rgba(138, 168, 200, 0.45); border-radius: 999px;
+      padding: 0.45rem 0.85rem; font-family: "Barlow Condensed", sans-serif; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase; font-size: 0.78rem;
+    }
+    .framework-strip { margin-top: 1.25rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .chip {
+      font-family: "Barlow Condensed", sans-serif; font-weight: 600; letter-spacing: 0.08em;
+      text-transform: uppercase; font-size: 0.75rem; padding: 0.4rem 0.7rem; border-radius: 999px;
+      background: var(--navy); color: #e8eef5;
+    }
+    .chip.alt { background: var(--slate); color: var(--navy); }
+    .purpose {
+      margin-top: 1.1rem; padding: 1rem 1.1rem; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(110,142,179,0.12), rgba(47,107,79,0.08));
+      border: 1px solid var(--line);
+    }
+    .purpose h2 {
+      margin: 0 0 0.35rem; font-family: "Barlow Condensed", sans-serif; font-size: 1.15rem;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--navy);
+    }
+    .purpose p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+    .page-title-row {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: 1rem;
+    }
+    .page-title-row h2 {
+      margin: 0; font-family: "Barlow Condensed", sans-serif; font-weight: 800; font-size: 1.7rem;
+      letter-spacing: 0.06em; text-transform: uppercase; color: var(--navy);
+    }
+    .page-title-row span {
+      font-family: "Barlow Condensed", sans-serif; color: var(--slate); letter-spacing: 0.14em;
+      text-transform: uppercase; font-size: 0.8rem; font-weight: 700;
+    }
+    .phase-grid { display: grid; gap: 1.25rem; }
+    .phase {
+      display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 1rem; align-items: start;
+      padding: 0.85rem; border: 1px solid var(--line); border-radius: 18px;
+      background: linear-gradient(180deg, #fff, #f8fbfe);
+    }
+    .phase:nth-child(even) { grid-template-columns: 0.85fr 1.15fr; }
+    .phase:nth-child(even) .phase-media { order: 2; }
+    .phase:nth-child(even) .phase-body { order: 1; }
+    .phase-media {
+      position: relative; border-radius: 14px; overflow: hidden; background: #0e1c2f;
+      align-self: start; min-height: 0;
+    }
+    .phase-media img {
+      width: 100%; height: auto; display: block;
+      object-fit: contain; object-position: center top;
+    }
+    .phase-num {
+      position: absolute; top: 0.75rem; left: 0.75rem; width: 2.4rem; height: 2.4rem;
+      border-radius: 50%; display: grid; place-items: center; background: rgba(14, 28, 47, 0.88);
+      color: #fff; border: 2px solid var(--slate-bright); font-family: "Barlow Condensed", sans-serif;
+      font-weight: 800; font-size: 1.1rem; z-index: 1;
+    }
+    .phase-body { display: flex; flex-direction: column; gap: 0.65rem; padding: 0.2rem 0.25rem; }
+    .phase-body h3 {
+      margin: 0; font-family: "Barlow Condensed", sans-serif; font-weight: 800; font-size: 1.55rem;
+      letter-spacing: 0.04em; text-transform: uppercase; color: var(--navy); line-height: 1.05;
+    }
+    .label {
+      font-family: "Barlow Condensed", sans-serif; font-weight: 700; font-size: 0.78rem;
+      letter-spacing: 0.16em; text-transform: uppercase; color: var(--slate); margin: 0;
+    }
+    .look-for { margin: 0; font-size: 0.92rem; color: var(--steel); }
+    .notes {
+      margin-top: auto; background: #fff; border: 1.5px dashed #b7c7d8; border-radius: 12px;
+      padding: 0.7rem 0.8rem 1.4rem; min-height: 5.5rem;
+    }
+    .notes p { margin: 0.35rem 0 0; color: #94a3b8; font-size: 0.85rem; font-style: italic; }
+    .priorities { display: grid; gap: 0.65rem; margin-top: 0.5rem; }
+    .priority {
+      display: grid; grid-template-columns: auto 1fr; gap: 0.85rem; align-items: start;
+      padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--line); background: #fff;
+    }
+    .priority .n {
+      width: 2rem; height: 2rem; border-radius: 8px; background: var(--navy); color: #fff;
+      display: grid; place-items: center; font-family: "Barlow Condensed", sans-serif;
+      font-weight: 800; font-size: 1.1rem;
+    }
+    .priority .line { border-bottom: 1px solid #c9d5e3; min-height: 1.6rem; margin-top: 0.35rem; }
+    .signoff { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.4rem; }
+    .signoff .field { border-bottom: 2px solid var(--line); padding-bottom: 0.35rem; }
+    .signoff .field span {
+      display: block; font-family: "Barlow Condensed", sans-serif; letter-spacing: 0.14em;
+      text-transform: uppercase; font-size: 0.75rem; color: var(--slate); font-weight: 700;
+    }
+    .thanks {
+      margin-top: 1.6rem; text-align: center; padding: 1.1rem; border-radius: 14px;
+      background: linear-gradient(135deg, var(--navy), var(--navy-2)); color: #e8eef5;
+    }
+    .thanks strong {
+      display: block; font-family: "Barlow Condensed", sans-serif; font-size: 1.35rem;
+      letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.25rem;
+    }
+    .thanks small { color: var(--slate-bright); letter-spacing: 0.06em; }
+    .screen-hint {
+      width: min(960px, calc(100% - 2rem)); margin: 1rem auto 0; padding: 0.75rem 1rem;
+      border-radius: 12px; background: rgba(14, 28, 47, 0.92); color: #dbe7f3; font-size: 0.88rem;
+      display: flex; justify-content: space-between; gap: 1rem; align-items: center; flex-wrap: wrap;
+    }
+    .screen-hint button {
+      border: 0; border-radius: 999px; padding: 0.55rem 1rem; background: var(--slate-bright);
+      color: var(--navy); font-family: "Barlow Condensed", sans-serif; font-weight: 700;
+      letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer;
+    }
+    .brand-svg text { font-family: "Barlow Condensed", Arial Black, sans-serif; }
+    @media (max-width: 820px) {
+      .cover-hero, .phase, .phase:nth-child(even) { grid-template-columns: 1fr; }
+      .phase:nth-child(even) .phase-media, .phase:nth-child(even) .phase-body { order: initial; }
+      .phase-media { min-height: 0; }
+    }
+
+    .notes-status { opacity: 0.85; font-size: 0.8rem; }
+    .notes-status.saved { color: #9fdfb8; }
+    .notes-status.saving { color: #f0d48a; }
+    .notes-status.error { color: #f5a8a8; }
+    [data-note-id] {
+      outline: none; min-height: 1.2em;
+    }
+    [data-note-id]:focus {
+      box-shadow: inset 0 0 0 2px rgba(110, 142, 179, 0.45);
+      border-radius: 6px;
+      background: rgba(255,255,255,0.9);
+    }
+    .notes [data-note-id].is-placeholder { color: #94a3b8; font-style: italic; }
+    .stat [data-note-id].is-placeholder { color: #94a3b8; font-weight: 600; }
+    .screen-hint .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+
+    .priority-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    }
+    .btn-del-priority {
+      border: 0; background: #e8eef5; color: var(--steel); border-radius: 999px;
+      font-family: "Barlow Condensed", sans-serif; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; font-size: 0.7rem; padding: 0.25rem 0.55rem; cursor: pointer;
+    }
+    .btn-del-priority:hover { background: #fde2e2; color: #9b1c1c; }
+    .priority.is-hidden { display: none !important; }
+    .commentary {
+      margin-top: 1.1rem; padding: 0.9rem 1rem; border-radius: 14px;
+      border: 1px solid var(--line); background: linear-gradient(180deg, #fff, #f7fafc);
+    }
+    .commentary [data-note-id] {
+      min-height: 4.5rem; margin-top: 0.35rem; white-space: pre-wrap;
+    }
+
+    @media print {
+      body { background: #fff; }
+      .screen-hint, .btn-del-priority { display: none !important; }
+      .sheet { width: 100%; margin: 0; }
+      .page {
+        box-shadow: none; border-radius: 0; margin: 0; padding: 0.16in 0.3in 0.7in;
+        page-break-after: always; break-after: page;
+        position: relative;
+        overflow: hidden !important;
+        /* Stay under letter + browser print margins so footer can't spill */
+        height: 9.5in;
+        max-height: 9.5in;
+      }
+      .page:last-child { page-break-after: auto; }
+      .page::before { display: none; }
+      .letterhead { margin-bottom: 0.3rem; padding-top: 0.06rem; padding-bottom: 0.22rem; }
+      .brand-mark svg { width: 220px; }
+      .page-foot {
+        position: absolute !important;
+        left: 0.3in;
+        right: 0.3in;
+        bottom: 0.08in;
+        margin: 0 !important;
+        padding-top: 0.28rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+        background: #fff;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        page-break-before: avoid !important;
+        break-before: avoid !important;
+      }
+      .page-foot .tagline {
+        flex: 1 1 auto;
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        letter-spacing: 0.08em;
+        font-size: 0.62rem;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+      .page-foot > div:last-child {
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+      /* Keep cover hero + photo on page 1 (match on-screen layout) */
+      .page.cover {
+        padding: 0.16in 0.3in 0.7in;
+        overflow: hidden !important;
+        height: 9.5in;
+        max-height: 9.5in;
+      }
+      .page.cover .letterhead { margin-bottom: 0.22rem; }
+      .page.cover .cover-hero {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 0.35rem;
+        align-items: start;
+        margin-top: 0.15rem;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .page.cover .cover-copy h1 { font-size: 2rem; margin: 0.05rem 0 0.2rem; line-height: 0.95; }
+      .page.cover .cover-lead { font-size: 0.74rem; margin: 0 0 0.28rem; max-width: none; line-height: 1.3; }
+      .page.cover .eyebrow { font-size: 0.68rem; }
+      .page.cover .stats { gap: 0.24rem; }
+      .page.cover .stat { padding: 0.28rem 0.4rem; border-radius: 8px; }
+      .page.cover .stat dt { font-size: 0.58rem; }
+      .page.cover .stat dd { font-size: 0.8rem; }
+      .page.cover .framework-strip { margin-top: 0.32rem; gap: 0.25rem; }
+      .page.cover .chip { font-size: 0.58rem; padding: 0.18rem 0.4rem; }
+      .page.cover .cover-photo {
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: 3.1in;
+        border-radius: 12px;
+        box-shadow: none;
+        align-self: start;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .page.cover .cover-photo img {
+        position: static !important;
+        inset: auto !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: 3.1in;
+        object-fit: contain;
+        object-position: center top;
+        display: block;
+      }
+      .page.cover .cover-photo .badge {
+        left: 0.55rem; bottom: 0.55rem; padding: 0.3rem 0.55rem; font-size: 0.65rem;
+      }
+      .page.cover .purpose { margin-top: 0.28rem; padding: 0.3rem 0.5rem; }
+      .page.cover .purpose h2 { font-size: 0.8rem; margin-bottom: 0.08rem; }
+      .page.cover .purpose p { font-size: 0.68rem; line-height: 1.3; }
+      .phase-grid { gap: 0.55rem; }
+      .phase {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        padding: 0.45rem 0.5rem;
+        gap: 0.55rem;
+        align-items: start;
+        border-radius: 12px;
+      }
+      /* Print: full still, scaled to column (never cropped like object-fit:cover) */
+      .phase-media {
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        align-self: start;
+        overflow: visible;
+        background: #0e1c2f;
+      }
+      .phase-media img {
+        position: static !important;
+        inset: auto !important;
+        width: auto !important;
+        max-width: 100% !important;
+        height: auto !important;
+        max-height: 3.35in;
+        object-fit: unset;
+        display: block;
+        margin: 0 auto;
+      }
+      .phase-body { gap: 0.35rem; padding: 0; min-width: 0; height: auto; }
+      .phase-body h3 { font-size: 1.15rem; }
+      .look-for { font-size: 0.72rem; line-height: 1.3; }
+      .label { font-size: 0.68rem; }
+      .notes {
+        margin-top: 0.2rem;
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0.4rem 0.5rem 0.45rem;
+        border-radius: 8px;
+      }
+      .notes p,
+      .notes [data-note-id] {
+        margin: 0.2rem 0 0;
+        color: var(--ink) !important;
+        font-style: normal !important;
+        font-size: 0.78rem;
+        line-height: 1.35;
+        white-space: pre-wrap;
+        overflow: visible !important;
+        text-overflow: unset;
+      }
+      .notes [data-note-id].is-placeholder {
+        color: #94a3b8 !important;
+        font-style: italic !important;
+      }
+      .page-title-row { margin-bottom: 0.45rem; }
+      .page-title-row h2 { font-size: 1.25rem; }
+      /* Phase pages: size to content; stills stretch with the cue column */
+      .page:not(.cover):not(:last-child) {
+        height: auto;
+        max-height: none;
+        overflow: visible !important;
+        padding-bottom: 0.35in;
+      }
+      .page:not(.cover):not(:last-child) .page-foot {
+        position: static !important;
+        left: auto;
+        right: auto;
+        bottom: auto;
+        margin-top: 0.45rem !important;
+        background: transparent;
+      }
+      .priority .line {
+        white-space: pre-wrap;
+        overflow: visible;
+        min-height: 1.2rem;
+        line-height: 1.35;
+        font-size: 0.82rem;
+        border-bottom: 0;
+      }
+      .priorities { gap: 0.45rem; }
+      .priority { padding: 0.55rem 0.7rem; }
+      /* Keep thank-you block above the pinned footer band */
+      .page:last-child .thanks {
+        margin-top: 0.9rem;
+        margin-bottom: 0.15in;
+        padding: 0.7rem 0.85rem;
+      }
+      .page:last-child .thanks strong { font-size: 1.05rem; }
+      .page:last-child .signoff { margin-top: 0.85rem; }
+      .page:last-child .commentary { margin-top: 0.75rem; padding: 0.65rem 0.75rem; }
+      .page:last-child .commentary [data-note-id] { min-height: 2.8rem; }
+      @page { size: letter; margin: 0.4in; }
+    }
+
+  </style>
+</head>
+<body>
+    <div class="screen-hint">
+    <span>Ben Staples - Mechanics Evaluation. Notes auto-save while you type; Download PDF also writes <code>notes.json</code>.</span>
+    <div class="actions">
+      <span class="notes-status" id="notesStatus">Notes ready</span>
+      <button type="button" id="btnSaveNotes">Save notes</button>
+      <button type="button" id="btnDownloadPdf">Download PDF</button>
+    </div>
+  </div>
+
+  <div class="sheet">
+    <section class="page cover">
+      <header class="letterhead">
+        <div class="brand-mark">
+          <svg class="brand-svg" viewBox="0 0 520 56" xmlns="http://www.w3.org/2000/svg" aria-label="THE NEXT PITCH">
+            <line x1="0" y1="8" x2="520" y2="8" stroke="#6e8eb3" stroke-width="2"/>
+            <text x="260" y="38" text-anchor="middle" fill="#0e1c2f" font-size="28" font-weight="800" letter-spacing="7">THE NEXT PITCH</text>
+            <line x1="0" y1="48" x2="520" y2="48" stroke="#6e8eb3" stroke-width="2"/>
+          </svg>
+          <div class="brand-tag">Mechanics Evaluation</div>
+        </div>
+        <div class="letterhead-meta">
+          <strong>thenextpitch.org</strong>
+          (971) 266-3377<br />
+          Package: Mechanics Evaluation
+        </div>
+      </header>
+
+      <div class="cover-hero">
+        <div class="cover-copy">
+          <div class="eyebrow">Athlete Report</div>
+          <h1>Ben Staples</h1>
+          <p class="cover-lead">A still-by-still walkthrough of your delivery - built for clear cues and next-step focus.</p>
+          <dl class="stats">
+            <div class="stat"><dt>Athlete</dt><dd>Ben Staples</dd></div>
+            <div class="stat"><dt>Session</dt><dd contenteditable="true" data-note-id="cover.session" data-placeholder="________">________</dd></div>
+            <div class="stat"><dt>Throws</dt><dd contenteditable="true" data-note-id="cover.throws" data-placeholder="________">________</dd></div>
+            <div class="stat"><dt>Age / Team</dt><dd contenteditable="true" data-note-id="cover.ageTeam" data-placeholder="________">________</dd></div>
+          </dl>
+          <div class="framework-strip">
+            <span class="chip">NPA</span>
+            <span class="chip alt">8 Checkpoints</span>
+            <span class="chip">Health-first mechanics</span>
+          </div>
+        </div>
+        <div class="cover-photo">
+          <img src="assets/release-point.jpg" alt="Ben Staples release point still" />
+          <div class="badge">Release - Follow through</div>
+        </div>
+      </div>
+
+      <div class="purpose">
+        <h2>Purpose</h2>
+        <p>Each section pairs a delivery still with what we look for at that position. <strong>Athlete notes / cues</strong> are for your coach-s specific feedback. Priority cues at the end become your training focus.</p>
+      </div>
+
+      <footer class="page-foot">
+        <div class="tagline">Advanced throwing - pitching mechanics - arm care - mental focus</div>
+        <div>Page 1</div>
+      </footer>
+    </section>
+
+    <section class="page">
+      <header class="letterhead">
+        <div class="brand-mark">
+          <svg class="brand-svg" viewBox="0 0 520 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="0" y1="8" x2="520" y2="8" stroke="#6e8eb3" stroke-width="2"/>
+            <text x="260" y="38" text-anchor="middle" fill="#0e1c2f" font-size="28" font-weight="800" letter-spacing="7">THE NEXT PITCH</text>
+            <line x1="0" y1="48" x2="520" y2="48" stroke="#6e8eb3" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="letterhead-meta"><strong>Ben Staples</strong>Mechanics Evaluation</div>
+      </header>
+      <div class="page-title-row"><h2>Delivery Phases</h2><span>01 - 02</span></div>
+      <div class="phase-grid">
+        <article class="phase">
+          <div class="phase-media"><div class="phase-num">01</div><img src="assets/balance.jpg" alt="Balance and posture" /></div>
+          <div class="phase-body">
+            <h3>Balance &amp; Posture</h3>
+            <p class="label">What we look for</p>
+            <p class="look-for">Tall, athletic posture over the rubber with a quiet head and stacked posture. The delivery starts from balance so the body can move on time without early leaks.</p>
+            <div class="notes"><p class="label">Athlete notes / cues</p><p contenteditable="true" data-note-id="phase.01.notes" data-placeholder="Add coach cues here...">Add coach cues here...</p></div>
+          </div>
+        </article>
+        <article class="phase">
+          <div class="phase-media"><div class="phase-num">02</div><img src="assets/lift.jpg" alt="Lift and shift" /></div>
+          <div class="phase-body">
+            <h3>Lift &amp; Shift</h3>
+            <p class="label">What we look for</p>
+            <p class="look-for">Controlled knee lift paired with a clean weight shift into the back hip/leg. Load the back side without collapsing posture or rushing the front side.</p>
+            <div class="notes"><p class="label">Athlete notes / cues</p><p contenteditable="true" data-note-id="phase.02.notes" data-placeholder="Add coach cues here...">Add coach cues here...</p></div>
+          </div>
+        </article>
+      </div>
+      <footer class="page-foot"><div class="tagline">thenextpitch.org - (971) 266-3377</div><div>Page 2</div></footer>
+    </section>
+
+    <section class="page">
+      <header class="letterhead">
+        <div class="brand-mark">
+          <svg class="brand-svg" viewBox="0 0 520 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="0" y1="8" x2="520" y2="8" stroke="#6e8eb3" stroke-width="2"/>
+            <text x="260" y="38" text-anchor="middle" fill="#0e1c2f" font-size="28" font-weight="800" letter-spacing="7">THE NEXT PITCH</text>
+            <line x1="0" y1="48" x2="520" y2="48" stroke="#6e8eb3" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="letterhead-meta"><strong>Ben Staples</strong>Mechanics Evaluation</div>
+      </header>
+      <div class="page-title-row"><h2>Delivery Phases</h2><span>03 - 04</span></div>
+      <div class="phase-grid">
+        <article class="phase">
+          <div class="phase-media"><div class="phase-num">03</div><img src="assets/thrust.jpg" alt="Thrust" /></div>
+          <div class="phase-body">
+            <h3>Thrust</h3>
+            <p class="label">What we look for</p>
+            <p class="look-for">Aggressive, directed drive off the back foot into the stride. Intent is forward force into the target line while staying stacked and under control.</p>
+            <div class="notes"><p class="label">Athlete notes / cues</p><p contenteditable="true" data-note-id="phase.03.notes" data-placeholder="Add coach cues here...">Add coach cues here...</p></div>
+          </div>
+        </article>
+        <article class="phase">
+          <div class="phase-media"><div class="phase-num">04</div><img src="assets/equal-opposite.jpg" alt="Equal and opposite" /></div>
+          <div class="phase-body">
+            <h3>Equal &amp; Opposite</h3>
+            <p class="label">What we look for</p>
+            <p class="look-for">Glove-side and throwing-side work in balance-arm path and glove path create opposing, organized movement so the torso can rotate cleanly later.</p>
+            <div class="notes"><p class="label">Athlete notes / cues</p><p contenteditable="true" data-note-id="phase.04.notes" data-placeholder="Add coach cues here...">Add coach cues here...</p></div>
+          </div>
+        </article>
+      </div>
+      <footer class="page-foot"><div class="tagline">thenextpitch.org - (971) 266-3377</div><div>Page 3</div></footer>
+    </section>
+
+    <section class="page">
+      <header class="letterhead">
+        <div class="brand-mark">
+          <svg class="brand-svg" viewBox="0 0 520 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="0" y1="8" x2="520" y2="8" stroke="#6e8eb3" stroke-width="2"/>
+            <text x="260" y="38" text-anchor="middle" fill="#0e1c2f" font-size="28" font-weight="800" letter-spacing="7">THE NEXT PITCH</text>
+            <line x1="0" y1="48" x2="520" y2="48" stroke="#6e8eb3" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="letterhead-meta"><strong>Ben Staples</strong>Mechanics Evaluation</div>
+      </header>
+      <div class="page-title-row"><h2>Delivery Phases</h2><span>05 - 06</span></div>
+      <div class="phase-grid">
+        <article class="phase">
+          <div class="phase-media"><div class="phase-num">05</div><img src="assets/delayed.jpg" alt="Delayed hips and shoulder" /></div>
+          <div class="phase-body">
+            <h3>Delayed Hips / Shoulder</h3>
+            <p class="label">What we look for</p>
+            <p class="look-for">Hips begin to open while the shoulders stay closed longer, creating separation (torque). The delay stores energy for a late, efficient upper-half fire.</p>
+            <div class="notes"><p class="label">Athlete notes / cues</p><p contenteditable="true" data-note-id="phase.05.notes" data-placeholder="Add coach cues here...">Add coach cues here...</p></div>
+          </div>
+        </article>
+        <article class="phase">
+          <div class="phase-media"><div class="phase-num">06</div><img src="assets/swivel.jpg" alt="Swivel and stabilize" /></div>
+          <div class="phase-body">
+            <h3>Swivel &amp; Stabilize</h3>
+            <p class="label">What we look for</p>
+            <p class="look-for">Front foot lands and the lead leg braces/stabilizes so the pelvis can swivel against a firm front side. Stability here protects timing and arm health.</p>
+            <div class="notes"><p class="label">Athlete notes / cues</p><p contenteditable="true" data-note-id="phase.06.notes" data-placeholder="Add coach cues here...">Add coach cues here...</p></div>
+          </div>
+        </article>
+      </div>
+      <footer class="page-foot"><div class="tagline">thenextpitch.org - (971) 266-3377</div><div>Page 4</div></footer>
+    </section>
+
+    <section class="page">
+      <header class="letterhead">
+        <div class="brand-mark">
+          <svg class="brand-svg" viewBox="0 0 520 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="0" y1="8" x2="520" y2="8" stroke="#6e8eb3" stroke-width="2"/>
+            <text x="260" y="38" text-anchor="middle" fill="#0e1c2f" font-size="28" font-weight="800" letter-spacing="7">THE NEXT PITCH</text>
+            <line x1="0" y1="48" x2="520" y2="48" stroke="#6e8eb3" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="letterhead-meta"><strong>Ben Staples</strong>Mechanics Evaluation</div>
+      </header>
+      <div class="page-title-row"><h2>Delivery Phases</h2><span>07 - 08</span></div>
+      <div class="phase-grid">
+        <article class="phase">
+          <div class="phase-media"><div class="phase-num">07</div><img src="assets/stack-track.jpg" alt="Stack and track" /></div>
+          <div class="phase-body">
+            <h3>Stack &amp; Track</h3>
+            <p class="label">What we look for</p>
+            <p class="look-for">Head, torso, and direction stay stacked and tracking to the target through rotation. Avoid flying open or pulling off the line early.</p>
+            <div class="notes"><p class="label">Athlete notes / cues</p><p contenteditable="true" data-note-id="phase.07.notes" data-placeholder="Add coach cues here...">Add coach cues here...</p></div>
+          </div>
+        </article>
+        <article class="phase">
+          <div class="phase-media"><div class="phase-num">08</div><img src="assets/release-point.jpg" alt="Release point and follow through" /></div>
+          <div class="phase-body">
+            <h3>Release &amp; Follow Through</h3>
+            <p class="label">What we look for</p>
+            <p class="look-for">A consistent release out front with a complete, decelerating follow-through. Finish the pitch so the arm and body can slow down safely after release.</p>
+            <div class="notes"><p class="label">Athlete notes / cues</p><p contenteditable="true" data-note-id="phase.08.notes" data-placeholder="Add coach cues here...">Add coach cues here...</p></div>
+          </div>
+        </article>
+      </div>
+      <footer class="page-foot"><div class="tagline">thenextpitch.org - (971) 266-3377</div><div>Page 5</div></footer>
+    </section>
+
+    <section class="page">
+      <header class="letterhead">
+        <div class="brand-mark">
+          <svg class="brand-svg" viewBox="0 0 520 56" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="0" y1="8" x2="520" y2="8" stroke="#6e8eb3" stroke-width="2"/>
+            <text x="260" y="38" text-anchor="middle" fill="#0e1c2f" font-size="28" font-weight="800" letter-spacing="7">THE NEXT PITCH</text>
+            <line x1="0" y1="48" x2="520" y2="48" stroke="#6e8eb3" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="letterhead-meta"><strong>Ben Staples</strong>Mechanics Evaluation</div>
+      </header>
+      <div class="page-title-row"><h2>Priority Cues / Next Steps</h2><span>Close</span></div>
+      <p style="margin:0 0 1rem;color:var(--muted);max-width:58ch;">Lock in 3-5 training priorities from this session. These become the language you use in catch play, towel work, and bullpens.</p>
+      <div class="priorities" id="prioritiesList">
+        <div class="priority" data-priority="1"><div class="n">1</div><div><div class="priority-head"><span class="label">Priority</span><button type="button" class="btn-del-priority" data-del-priority="1">Delete</button></div><div class="line" contenteditable="true" data-note-id="priority.1" data-placeholder=""></div></div></div>
+        <div class="priority" data-priority="2"><div class="n">2</div><div><div class="priority-head"><span class="label">Priority</span><button type="button" class="btn-del-priority" data-del-priority="2">Delete</button></div><div class="line" contenteditable="true" data-note-id="priority.2" data-placeholder=""></div></div></div>
+        <div class="priority" data-priority="3"><div class="n">3</div><div><div class="priority-head"><span class="label">Priority</span><button type="button" class="btn-del-priority" data-del-priority="3">Delete</button></div><div class="line" contenteditable="true" data-note-id="priority.3" data-placeholder=""></div></div></div>
+        <div class="priority" data-priority="4"><div class="n">4</div><div><div class="priority-head"><span class="label">Priority</span><button type="button" class="btn-del-priority" data-del-priority="4">Delete</button></div><div class="line" contenteditable="true" data-note-id="priority.4" data-placeholder=""></div></div></div>
+        <div class="priority" data-priority="5"><div class="n">5</div><div><div class="priority-head"><span class="label">Priority</span><button type="button" class="btn-del-priority" data-del-priority="5">Delete</button></div><div class="line" contenteditable="true" data-note-id="priority.5" data-placeholder=""></div></div></div>
+      </div>
+      <div class="commentary">
+        <p class="label">Commentary</p>
+        <div contenteditable="true" data-note-id="closing.commentary" data-placeholder="Additional commentary, context, or parent notes..."></div>
+      </div>
+      <div class="signoff">
+        <div class="field"><span>Coach</span><div contenteditable="true" data-note-id="signoff.coach" data-placeholder="" style="min-height:1.4rem;margin-top:0.25rem;"></div></div>
+        <div class="field"><span>Date</span><div contenteditable="true" data-note-id="signoff.date" data-placeholder="" style="min-height:1.4rem;margin-top:0.25rem;"></div></div>
+      </div>
+      <div class="thanks">
+        <strong>Thank you for training with THE NEXT PITCH</strong>
+        <small>thenextpitch.org - (971) 266-3377</small>
+      </div>
+      <footer class="page-foot">
+        <div class="tagline">Advanced throwing - pitching mechanics - arm care - mental focus</div>
+        <div>Page 6</div>
+      </footer>
+    </section>
+  </div>
+
+<script>
+
+(function () {
+  const STORAGE_KEY = "tnp.ben-staples.notes.v1";
+  const PLACEHOLDERS = new Set(["________", "Add coach cues here...", "Add coach cues here-", "Additional commentary, context, or parent notes..."]);
+  const statusEl = document.getElementById("notesStatus");
+  let saveTimer = null;
+  let hiddenPriorities = [];
+  let booted = false;
+
+  function setStatus(text, cls) {
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.className = "notes-status" + (cls ? " " + cls : "");
+  }
+
+  function fieldValue(el) {
+    const raw = (el.innerText || "").replace(/\u00a0/g, " ").trim();
+    const ph = el.getAttribute("data-placeholder") || "";
+    if (!raw || raw === ph || PLACEHOLDERS.has(raw)) return "";
+    return raw;
+  }
+
+  function collectNotes() {
+    const sections = {};
+    document.querySelectorAll("[data-note-id]").forEach((el) => {
+      sections[el.getAttribute("data-note-id")] = fieldValue(el);
+    });
+    return {
+      athlete: "Ben Staples",
+      report: "mechanics-evaluation",
+      updatedAt: new Date().toISOString(),
+      sections,
+      ui: { hiddenPriorities: hiddenPriorities.slice() },
+    };
+  }
+
+  function applyHiddenPriorities(list) {
+    hiddenPriorities = Array.isArray(list) ? list.map(String) : [];
+    document.querySelectorAll(".priority[data-priority]").forEach((row) => {
+      const id = row.getAttribute("data-priority");
+      row.classList.toggle("is-hidden", hiddenPriorities.includes(id));
+    });
+  }
+
+  function applyNotes(payload) {
+    const sections = (payload && payload.sections) || {};
+    document.querySelectorAll("[data-note-id]").forEach((el) => {
+      const id = el.getAttribute("data-note-id");
+      const ph = el.getAttribute("data-placeholder") || "";
+      const value = sections[id];
+      if (value && String(value).trim()) {
+        el.textContent = String(value);
+        el.classList.remove("is-placeholder");
+      } else {
+        el.textContent = ph;
+        if (ph) el.classList.add("is-placeholder");
+        else el.classList.remove("is-placeholder");
+      }
+    });
+    applyHiddenPriorities(payload && payload.ui && payload.ui.hiddenPriorities);
+  }
+
+  function persistLocal(payload) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch (_) {}
+  }
+
+  async function persistDisk(payload) {
+    const res = await fetch("/api/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return res.json();
+  }
+
+  function downloadNotesFallback(payload) {
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ben-staples-notes.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function saveNotes(opts) {
+    opts = opts || {};
+    if (!booted) return null;
+    const payload = collectNotes();
+    persistLocal(payload);
+    setStatus("Saving notes...", "saving");
+    try {
+      await persistDisk(payload);
+      setStatus("Saved to notes.json", "saved");
+      return payload;
+    } catch (err) {
+      if (opts.downloadFallback) {
+        downloadNotesFallback(payload);
+        setStatus("Downloaded notes.json (start serve.py for disk save)", "error");
+      } else {
+        setStatus("Saved in browser (serve.py for disk)", "error");
+      }
+      return payload;
+    }
+  }
+
+  function scheduleSave() {
+    if (!booted) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { saveNotes({ downloadFallback: false }); }, 450);
+  }
+
+  function bindField(el) {
+    if (el.dataset.bound === "1") return;
+    el.dataset.bound = "1";
+    const ph = el.getAttribute("data-placeholder") || "";
+    if (!fieldValue(el) && ph) el.classList.add("is-placeholder");
+
+    el.addEventListener("focus", function () {
+      const t = (el.innerText || "").trim();
+      if (t === ph || PLACEHOLDERS.has(t)) {
+        el.textContent = "";
+        el.classList.remove("is-placeholder");
+      }
+    });
+    el.addEventListener("blur", function () {
+      if (!fieldValue(el)) {
+        el.textContent = ph;
+        if (ph) el.classList.add("is-placeholder");
+      }
+      scheduleSave();
+    });
+    el.addEventListener("input", function () {
+      el.classList.remove("is-placeholder");
+      scheduleSave();
+    });
+  }
+
+  function bindAllFields() {
+    document.querySelectorAll("[data-note-id]").forEach(bindField);
+  }
+
+  var prioritiesList = document.getElementById("prioritiesList");
+  if (prioritiesList) {
+    prioritiesList.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-del-priority]");
+      if (!btn) return;
+      var id = String(btn.getAttribute("data-del-priority"));
+      var row = document.querySelector('.priority[data-priority="' + id + '"]');
+      if (!row) return;
+      var field = row.querySelector("[data-note-id]");
+      if (field) {
+        field.textContent = "";
+        field.classList.remove("is-placeholder");
+      }
+      if (hiddenPriorities.indexOf(id) === -1) hiddenPriorities.push(id);
+      row.classList.add("is-hidden");
+      scheduleSave();
+    });
+  }
+
+  document.getElementById("btnSaveNotes").addEventListener("click", function () {
+    saveNotes({ downloadFallback: true });
+  });
+
+  document.getElementById("btnDownloadPdf").addEventListener("click", async function () {
+    await saveNotes({ downloadFallback: true });
+    setTimeout(function () { window.print(); }, 200);
+  });
+
+  async function boot() {
+    var loaded = null;
+    try {
+      var res = await fetch("/api/notes", { cache: "no-store" });
+      if (res.ok) loaded = await res.json();
+    } catch (_) {}
+    if (!loaded || !loaded.sections) {
+      try { loaded = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); } catch (_) {}
+    }
+    if (loaded && loaded.sections) {
+      applyNotes(loaded);
+      setStatus("Notes loaded", "saved");
+    } else {
+      setStatus("Notes ready", "");
+    }
+    bindAllFields();
+    booted = true;
+  }
+
+  boot();
+})();
+
+</script>
+
+
+</body>
+</html>

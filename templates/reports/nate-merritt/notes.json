@@ -1,0 +1,29 @@
+{
+  "athlete": "Nate Merritt",
+  "report": "mechanics-evaluation",
+  "updatedAt": "2026-08-08T20:16:23.625Z",
+  "sections": {
+    "cover.session": "",
+    "cover.throws": "",
+    "cover.ageTeam": "",
+    "phase.01.notes": "I would widen your stance just slightly and match your knee bend in your lift to your pivot leg. This will remove the rock back that you do before you slowly roll into forward drive after getting to top of your lift in \"Lift & shift\".",
+    "phase.02.notes": "Good position here - we want a 25-30 degree angle from your lead hip to your pivot foot. Eliminating the rock back in the first phase will get this.",
+    "phase.03.notes": "You get stuck on your backside a little bit and at this moment here in your delivery there is no additional drive off of the mound. You are losing out on driving that momentum forward to generate more force.",
+    "phase.04.notes": "In thrust phase I can almost draw a line through your elbows. Here they are at opposite angles. You are opening up too early and cutting off your rotation as a result. We want to see you still loading until just after foot strike.",
+    "phase.05.notes": "If we fix the notes in phase 04 it should translate to this being back on time. Right here you are ready to throw a little early.",
+    "phase.06.notes": "I would move you closer to first base side such that your torso is in line with center of home plate at release",
+    "phase.07.notes": "Good position here",
+    "phase.08.notes": "If we fix the earlier issues in the delivery your release will be significantly closer to home. As a big lefty this will translate to more intimidation and perceived velo - especially if you give an angry grunt / glare ;)",
+    "priority.1": "Immediately move over on the mound to center your torso, widen your stance just slightly, and bend your lift leg to match the pivot. Have somebody record post to see if the rock where your head moves back wards goes away. The rocking tends to cause command issues and causes you to get less of an energy angle on lift resulting in less forward momentum, less force, less velocity. These two adjustments should improve command.",
+    "priority.2": "You build your momentum well, smoothly. There is a point in your delivery where you can't hold the position any longer. Its at that point where you need to accelerate down the mound into foot strike. This will create significantly higher ground forces that translate up and out the chain. If we had you on a mocap this is where we'd see one hiccup in your delivery.",
+    "priority.3": "You \"open up too early\" which means that you are not loading your torso into foot strike. Think of it like throwing a punch. You need to load your shoulders to throw the punch NOT flip the arm up prior to rotation and having it ride along. Another cue is your body has an X running from arm pit to opposite hip on both sides. Stretch that X as much as possible into foot strike then let it snap like a rubber band (in your body it actually is a giant rubber band). Lastly some guys are hips vs shoulders. If these cues don't work for you, try firing your hips while your torso stays to create the separation. This isn't really something you should chase though like when coaches told you maybe hitting to \"fire hips\" and try to train it consciously. The delivery must be fluid. It is a timing issue where you need to continue loading until just after foot strike before you start rotating which will turn your torso into a catapult while your arm goes along for the ride.",
+    "priority.4": "One the above points, play with your glove action. You turn it down pretty early and tuck it. This can sometimes cut off rotation by actually making it too firm too early. A firm glove we want/need because it allows us to rotate as fast as we can while maintaining direction BUT you can try to introduce a little more fluidity leading into rotation which might on its own get you in to the positions I'm talking about in the former suggestions (priority 3)",
+    "priority.5": "",
+    "signoff.coach": "Tim Linquist",
+    "signoff.date": "8/08/2026",
+    "closing.commentary": "Based on what you said this is probably your first introduction to the biomechanics of pitching. DO NOT LET THIS OVERCOMPLICATE THINGS! It is a very smooth process that we do not want to inhibit over thinking mechanics. It depends on how you learn. If you are a simple, go hard, shover then the cues are simple - Widen the stance, stretch the X, and throw hard through your target. Play with some fluidity drills in catch play to see if that cleans up the rotation from the stiff glove. Take video and watch to see differences - Are you moving down the mound faster when you widen the stance? Are you feeling more force in your plant if you drive at that last point of holding your momentum as you go down the mound?\n\n\nOnce you're able to translate a couple of these simple things then we can try a different cue called \"pimping the finish\" which I've seen reliably give guys a few mph bump. There's a lot in the tank here. If you get on the arm care I set you up with and start translating these sky is the limit. Physically you don't need to add anything. Mechanically and arm strength is where I'd focus and I'd expect 5-6mph increase by season start. Call me with questions. I'm back Aug 23rd. Keep me posted on progress"
+  },
+  "ui": {
+    "hiddenPriorities": []
+  }
+}

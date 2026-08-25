@@ -1,0 +1,32 @@
+{
+  "athlete": "Ben Staples",
+  "report": "mechanics-evaluation",
+  "updatedAt": "2026-08-02T21:26:05.571Z",
+  "sections": {
+    "cover.session": "7/29/2026",
+    "cover.throws": "R",
+    "cover.ageTeam": "13/Premier 14u",
+    "phase.01.notes": "Straight legs = max height means he will have to drop way down (head movement - for command)",
+    "phase.02.notes": "We want to see a 25-30 degree angle here at peak lift (max knee height)",
+    "phase.03.notes": "This is the drop you get when standing too tall; then he gets stuck on his backside - no energy transfer",
+    "phase.04.notes": "He is in a good position here!",
+    "phase.05.notes": "What we want to see is after weight fully transferred to block he continues to load (separate) torso from pelvis",
+    "phase.06.notes": "He is in a decent position here but no extension, and he has exceptional layback hes not leveraging",
+    "phase.07.notes": "This is a decent position we just need to straighten him up a little",
+    "phase.08.notes": "want to see 10-15 degrees of tilt from centerline. With this title I would move him to the 3rd base side until we fix the tilt",
+    "priority.1": "Arm care score was within range. He definitely needs to build strength and explosiveness. I would recommend/provide a full arm care routine + weight training 2x weekly.",
+    "priority.2": "Tackle the starting position to get more athletic and start learning how to create a proper angle on lift that will translate to energy moving through the chain. He will move faster down the mound and use his very long, loose levers much more effectively. This will also improve his command.",
+    "priority.3": "Establish a regular throwing routine using simple tools to start teaching effective pitch design, how to self improve, and keep the arm working under a manageable workload based on demands (fall vs winter vs spring)",
+    "priority.4": "",
+    "priority.5": "",
+    "signoff.coach": "Tim Linquist",
+    "signoff.date": "8/2/2026",
+    "closing.commentary": ""
+  },
+  "ui": {
+    "hiddenPriorities": [
+      "4",
+      "5"
+    ]
+  }
+}

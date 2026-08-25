@@ -1,0 +1,27 @@
+---
+description: Generate THE NEXT PITCH NPA mechanics evaluation reports from athlete stills.
+alwaysApply: true
+---
+
+# Mechanics evaluation reports
+
+When the user asks to create, open, or rebuild an athlete mechanics report (or gives an athlete name + stills path), follow `.cursor/skills/mechanics-evaluation-report/SKILL.md`.
+
+Reports are a **local CLI** in this repo (`tools/mechanics-report/`). Do not invent a new template or wire the React/Go app for this yet.
+
+```bash
+python3 tools/mechanics-report/new_report.py create \
+  --athlete "Jane Doe" \
+  --stills "/absolute/path/to/stills" \
+  --serve
+```
+
+Example user ask: "Generate a report for Jane Doe. Stills are in ~/Downloads/jane."
+
+Rules:
+- One folder per athlete: `templates/reports/<slug>/` (stills, `notes.json`, HTML).
+- NPA only. Do not use Tom House language.
+- Do not draft coach cues unless the user provides them.
+- If still mapping fails, stop and ask. Pass `--map` or rename files.
+- Reopen with `python3 tools/mechanics-report/new_report.py serve --slug <slug>`.
+- Ben Staples is the filled example. Do not wipe `templates/reports/ben-staples/notes.json`.

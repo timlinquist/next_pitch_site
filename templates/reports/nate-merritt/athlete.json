@@ -1,0 +1,19 @@
+{
+  "athlete": "Nate Merritt",
+  "slug": "nate-merritt",
+  "report": "mechanics-evaluation",
+  "createdAt": "2026-08-08T19:31:03.778862+00:00",
+  "stillsSource": "/Users/tlinquist/Downloads/nate-merritt",
+  "coverStill": "release-point.jpg",
+  "stills": {
+    "balance": "balance.jpg",
+    "lift": "lift.jpg",
+    "thrust": "thrust.jpg",
+    "equal-opposite": "equal-opposite.jpg",
+    "delayed": "delayed.jpg",
+    "swivel": "swivel.jpg",
+    "stack-track": "stack-track.jpg",
+    "release-point": "release-point.jpg"
+  },
+  "port": 8765
+}
