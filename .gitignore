@@ -5,6 +5,10 @@ frontend/node_modules/
 # Build output
 frontend/dist/
 
+# Python
+*.pyc
+**/__pycache__/
+
 # Environment files (contain secrets)
 .env
 .env.*
@@ -15,6 +19,7 @@ backend/.env.*
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
+*.log
 
 # OS files
 .DS_Store
