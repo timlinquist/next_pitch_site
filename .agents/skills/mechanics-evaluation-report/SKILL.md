@@ -37,7 +37,7 @@ python3 tools/mechanics-report/new_report.py --reports-root "/external/evals/202
 ```
 
 The server binds to loopback and selects a free port. Read the printed URL. Validate all eight phase images, the athlete name, date, note load/save, and print layout. Preserve the complete delivery frame inside each image view; remove phone interface areas as described below.
-6. Upload `index.html`, `notes.json`, `athlete.json`, and an archive of the complete report directory to the verified Drive evaluation folder. The archive includes `index.source.html` and assets; it excludes server code. Verify uploaded file names and sizes through Drive readback. Record the source folder URL in the external athlete metadata. Give the user the verified Drive folder link.
+6. Upload `index.html`, a final PDF, `notes.json`, `athlete.json`, and an archive of the complete report directory to the verified Drive evaluation folder. The archive includes `index.source.html` and assets; it excludes server code. Verify uploaded file names and sizes through Drive readback. Record the source folder URL in the external athlete metadata. Give the user the verified Drive folder link.
 
 ## Phone screenshots and final review
 
@@ -49,7 +49,11 @@ Wait for the user to finish the notes. Keep their editor tab and server open dur
 
 Create a separate standalone review HTML with the exact saved notes embedded in its markup, embedded images, approved crops, and hidden priorities removed. Remove editor scripts from this static copy so a server or browser storage cannot overwrite its notes. Preserve the editable report separately. Show the review before final publication when the user requests review.
 
-After approval, upload the reviewed static HTML as `index.html`, the latest `notes.json`, and the refreshed archive. Include the editable HTML as `editor.html`, plus source HTML and original assets. When reopening, use `editor.html` for note entry (or restore it as the local `index.html` first); regenerate the static final report after edits. Verify that the archive and standalone HTML use the same approved notes and crops.
+A final report always includes a PDF. Export the approved static HTML with its print styles, fonts, embedded notes, and cropped image views. Use a descriptive filename such as `<athlete-slug>-<evaluation-date>-report.pdf`. Enable background graphics and disable browser URL/date headers and footers.
+
+Render and inspect every PDF page before upload. Check the athlete identity, evaluation date, all eight checkpoints, all saved notes, priorities, and signoff. Check for missing images, clipped text, blank pages, unexpected phase splits, and phone interface areas. Print rules can override viewport image positions; responsive screen rules can stack phase columns in print. Correct those print-specific rules and regenerate when needed. Match the page labels to the actual PDF pages. Keep a reasonable readable type size.
+
+After approval, upload the final PDF and the reviewed static HTML as `index.html`, the latest `notes.json`, and the refreshed archive. Include the editable HTML as `editor.html`, plus source HTML and original assets. When reopening, use `editor.html` for note entry (or restore it as the local `index.html` first); regenerate the static final report after edits. Include the final PDF in the archive too. Verify that the PDF, archive, and standalone HTML use the same approved notes, identity, and crops. Verify the uploaded PDF name, nonzero size, and evaluation folder through Drive readback.
 
 ## Edit and reopen
 
@@ -66,4 +70,4 @@ Use the browser's Download PDF action for an editor PDF, or print the standalone
 
 ## Completion
 
-Confirm eight stills, the supplied evaluation date, preserved notes, one shared server, and a verified Drive save. Check `git status` to ensure that no athlete artifacts enter the commit.
+Confirm eight stills, the supplied evaluation date, preserved notes, one shared server, and a verified Drive save that includes the final PDF. Do not mark the report complete when only HTML or an archive exists. Check `git status` to ensure that no athlete artifacts enter the commit.
