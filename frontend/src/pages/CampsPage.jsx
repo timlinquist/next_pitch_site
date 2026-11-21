@@ -115,8 +115,8 @@ const CampsPage = () => {
                             {isCampFull(camp) ? (
                                 <button className="btn" disabled>Full</button>
                             ) : (
-                                <Link to={`/camps/${camp.slug}/register`} className="btn">
-                                    Register Now
+                                <Link to={`/camps/${camp.slug}`} className="btn">
+                                    View Details
                                 </Link>
                             )}
                         </div>

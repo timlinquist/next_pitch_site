@@ -2,7 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useAuth0Context } from '../contexts/Auth0Context';
 import { getApiUrl } from '../utils/api';
+import LocationPicker from '../components/LocationPicker';
 import '../styles/camps.css';
+
+const EMPTY_LOCATION = {
+    venue_name: '',
+    street: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'US',
+};
 
 const generateSlug = (name) => {
     return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -28,12 +38,14 @@ const AdminCampsPage = () => {
         slug: '',
         capacity_mode: 'simple',
         age_groups: [],
+        location: { ...EMPTY_LOCATION },
     });
+    const [existingLocations, setExistingLocations] = useState([]);
 
     useEffect(() => {
         if (userLoading) return;
         if (isAdmin) {
-            fetchCamps().finally(() => setLoading(false));
+            Promise.all([fetchCamps(), fetchLocations()]).finally(() => setLoading(false));
         } else {
             setLoading(false);
         }
@@ -47,6 +59,20 @@ const AdminCampsPage = () => {
             setCamps(data || []);
         } catch (err) {
             setError('Failed to load camps.');
+        }
+    };
+
+    const fetchLocations = async () => {
+        try {
+            const token = await getAccessTokenSilently();
+            const res = await fetch(getApiUrl('locations'), {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            setExistingLocations(data || []);
+        } catch (err) {
+            // non-fatal
         }
     };
 
@@ -119,7 +145,12 @@ const AdminCampsPage = () => {
     };
 
     const resetForm = () => {
-        setFormData({ name: '', description: '', start_date: '', end_date: '', price: '', max_capacity: '', slug: '', capacity_mode: 'simple', age_groups: [] });
+        setFormData({
+            name: '', description: '', start_date: '', end_date: '',
+            price: '', max_capacity: '', slug: '',
+            capacity_mode: 'simple', age_groups: [],
+            location: { ...EMPTY_LOCATION },
+        });
         setEditingCamp(null);
         setShowForm(false);
     };
@@ -138,6 +169,12 @@ const AdminCampsPage = () => {
                 setError(validationError);
                 return;
             }
+        }
+
+        const loc = formData.location || {};
+        if (!loc.street || !loc.city || !loc.state || !loc.zip) {
+            setError('Location street, city, state, and zip are required');
+            return;
         }
 
         try {
@@ -160,6 +197,14 @@ const AdminCampsPage = () => {
                         price: parseFloat(g.price),
                     }))
                     : [],
+                location: {
+                    venue_name: loc.venue_name || null,
+                    street: loc.street,
+                    city: loc.city,
+                    state: loc.state,
+                    zip: loc.zip,
+                    country: loc.country || 'US',
+                },
             };
 
             const url = editingCamp
@@ -181,7 +226,7 @@ const AdminCampsPage = () => {
             }
 
             resetForm();
-            await fetchCamps();
+            await Promise.all([fetchCamps(), fetchLocations()]);
         } catch (err) {
             setError(err.message);
         }
@@ -206,6 +251,14 @@ const AdminCampsPage = () => {
                     price: String(g.price),
                 }))
                 : [],
+            location: camp.location ? {
+                venue_name: camp.location.venue_name || '',
+                street: camp.location.street,
+                city: camp.location.city,
+                state: camp.location.state,
+                zip: camp.location.zip,
+                country: camp.location.country || 'US',
+            } : { ...EMPTY_LOCATION },
         });
         setEditingCamp(camp);
         setShowForm(true);
@@ -287,6 +340,14 @@ const AdminCampsPage = () => {
                         <div className="form-group">
                             <label htmlFor="camp-end">End Date</label>
                             <input type="date" id="camp-end" name="end_date" value={formData.end_date} onChange={handleFormChange} required />
+                        </div>
+                        <div className="form-group">
+                            <label>Location</label>
+                            <LocationPicker
+                                value={formData.location}
+                                onChange={(location) => setFormData({ ...formData, location })}
+                                existingLocations={existingLocations}
+                            />
                         </div>
                         <div className="form-group capacity-mode-toggle">
                             <label>Capacity Mode</label>

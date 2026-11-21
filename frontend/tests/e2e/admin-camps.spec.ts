@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { authStoragePath } from './helpers/auth';
-import { seedTestCamp, seedTestRegistration, type TestCamp } from './helpers/db';
+import { seedTestCamp, seedTestLocation, seedTestRegistration, type TestCamp } from './helpers/db';
 
 test.use({ storageState: authStoragePath });
 
@@ -19,6 +19,10 @@ test('admin creates a camp', async ({ page }) => {
   await page.locator('#camp-desc').fill('Created by admin E2E test');
   await page.locator('#camp-start').fill('2026-08-01');
   await page.locator('#camp-end').fill('2026-08-03');
+  await page.locator('#location-street').fill('123 Test St');
+  await page.locator('#location-city').fill('Testville');
+  await page.locator('#location-state').fill('IL');
+  await page.locator('#location-zip').fill('60000');
   await page.locator('#camp-price').fill('75');
   await page.locator('#camp-cap').fill('15');
 
@@ -46,6 +50,10 @@ test('admin creates a camp with age range capacity', async ({ page }) => {
   await page.locator('#camp-desc').fill('Camp with age groups');
   await page.locator('#camp-start').fill('2026-09-01');
   await page.locator('#camp-end').fill('2026-09-03');
+  await page.locator('#location-street').fill('123 Test St');
+  await page.locator('#location-city').fill('Testville');
+  await page.locator('#location-state').fill('IL');
+  await page.locator('#location-zip').fill('60000');
 
   // Switch to age range mode (price is per-group, not camp-level)
   await page.getByLabel('Age Range').check();
@@ -71,9 +79,14 @@ test('admin creates a camp with age range capacity', async ({ page }) => {
 
 test('admin views registrations', async ({ page }) => {
   // Seed a camp with a registration
+  const loc = await seedTestLocation({
+    venue_name: 'E2E Test Reg View Venue',
+    street: `${Date.now()}-view Ln`,
+  });
   const camp = await seedTestCamp({
     name: 'E2E Test Reg View Camp',
     price_cents: 5000,
+    location_id: loc.id,
   });
   await seedTestRegistration(camp.id, {
     athleteName: 'E2E Test Viewable Athlete',

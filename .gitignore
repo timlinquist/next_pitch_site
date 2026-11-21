@@ -24,3 +24,6 @@ frontend/.env.*
 .vscode
 *.swp
 *.swo
+
+# Superpowers brainstorm artifacts
+.superpowers/

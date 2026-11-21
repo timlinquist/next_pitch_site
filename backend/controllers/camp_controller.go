@@ -10,14 +10,16 @@ import (
 )
 
 type CampController struct {
-	campService *services.CampService
-	userService *services.UserService
+	campService     *services.CampService
+	locationService *services.LocationService
+	userService     *services.UserService
 }
 
-func NewCampController(campService *services.CampService, userService *services.UserService) *CampController {
+func NewCampController(campService *services.CampService, locationService *services.LocationService, userService *services.UserService) *CampController {
 	return &CampController{
-		campService: campService,
-		userService: userService,
+		campService:     campService,
+		locationService: locationService,
+		userService:     userService,
 	}
 }
 
@@ -102,6 +104,7 @@ func (ctrl *CampController) GetCampBySlug(c *gin.Context) {
 type createCampRequest struct {
 	models.Camp
 	AgeGroups []models.CampAgeGroup `json:"age_groups"`
+	Location  *models.Location      `json:"location" binding:"required"`
 }
 
 func (ctrl *CampController) CreateCamp(c *gin.Context) {
@@ -136,19 +139,39 @@ func (ctrl *CampController) CreateCamp(c *gin.Context) {
 		req.Camp.MaxCapacity = nil
 	}
 
-	if err := ctrl.campService.CreateCamp(&req.Camp); err != nil {
+	if req.Location == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "location is required"})
+		return
+	}
+	if req.Location.Street == "" || req.Location.City == "" || req.Location.State == "" || req.Location.Zip == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "location street, city, state, and zip are required"})
+		return
+	}
+	locID, err := ctrl.locationService.UpsertByStreetZip(req.Location)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save location: " + err.Error()})
+		return
+	}
+	req.Camp.LocationID = &locID
+
+	if err = ctrl.campService.CreateCamp(&req.Camp); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create camp: " + err.Error()})
 		return
 	}
 
 	if len(req.AgeGroups) > 0 {
-		if err := ctrl.campService.SetAgeGroups(req.Camp.ID, req.AgeGroups); err != nil {
+		if err = ctrl.campService.SetAgeGroups(req.Camp.ID, req.AgeGroups); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set age groups: " + err.Error()})
 			return
 		}
 	}
 
-	c.JSON(http.StatusCreated, ctrl.buildCampWithSpots(req.Camp))
+	created, err := ctrl.campService.GetCampByID(req.Camp.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload camp"})
+		return
+	}
+	c.JSON(http.StatusCreated, ctrl.buildCampWithSpots(*created))
 }
 
 func (ctrl *CampController) UpdateCamp(c *gin.Context) {
@@ -190,17 +213,37 @@ func (ctrl *CampController) UpdateCamp(c *gin.Context) {
 		req.Camp.MaxCapacity = nil
 	}
 
-	if err := ctrl.campService.UpdateCamp(&req.Camp); err != nil {
+	if req.Location == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "location is required"})
+		return
+	}
+	if req.Location.Street == "" || req.Location.City == "" || req.Location.State == "" || req.Location.Zip == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "location street, city, state, and zip are required"})
+		return
+	}
+	locID, upErr := ctrl.locationService.UpsertByStreetZip(req.Location)
+	if upErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save location: " + upErr.Error()})
+		return
+	}
+	req.Camp.LocationID = &locID
+
+	if err = ctrl.campService.UpdateCamp(&req.Camp); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update camp: " + err.Error()})
 		return
 	}
 
-	if err := ctrl.campService.SetAgeGroups(req.Camp.ID, req.AgeGroups); err != nil {
+	if err = ctrl.campService.SetAgeGroups(req.Camp.ID, req.AgeGroups); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to set age groups: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, ctrl.buildCampWithSpots(req.Camp))
+	updated, err := ctrl.campService.GetCampByID(req.Camp.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload camp"})
+		return
+	}
+	c.JSON(http.StatusOK, ctrl.buildCampWithSpots(*updated))
 }
 
 func (ctrl *CampController) DeactivateCamp(c *gin.Context) {

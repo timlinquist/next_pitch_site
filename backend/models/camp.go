@@ -14,6 +14,8 @@ type Camp struct {
 	MaxCapacity *int      `json:"max_capacity"`
 	Slug        *string   `json:"slug"`
 	IsActive    bool      `json:"is_active"`
+	LocationID  *int      `json:"location_id,omitempty"`
+	Location    *Location `json:"location,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
