@@ -1,29 +1,13 @@
-# Mechanics evaluation reports (local)
+# Mechanics evaluation reports
 
-Coach-local NPA mechanics HTML reports for THE NEXT PITCH.
+Use the shared [skill](../../.agents/skills/mechanics-evaluation-report/SKILL.md) from Cursor, Claude, or Codex.
 
-This package is **not** wired into the React/Go web app yet. Use the CLI on your machine. Self-service in the site comes later.
-
-## Create a report
+Athlete data belongs in Google Drive at `Next Pitch LLC/<athlete-name>/evals/<YYYY-MM-DD>/`. The ignored `templates/reports/` directory is a local cache. Keep reusable templates in `tools/mechanics-report/template/`.
 
 ```bash
-python3 tools/mechanics-report/new_report.py create \
-  --athlete "Jane Doe" \
-  --stills "/absolute/path/to/stills" \
-  --serve
+python3 tools/mechanics-report/new_report.py --reports-root /external/evals/2026-11-20 create --athlete "Jane Doe" --stills /external/stills --session 2026-11-20
+python3 tools/mechanics-report/new_report.py --reports-root /external/evals/2026-11-20 serve --slug jane-doe
+python3 tools/mechanics-report/serve.py /external/evals/2026-11-20/jane-doe
 ```
 
-## Reopen
-
-```bash
-python3 tools/mechanics-report/new_report.py list
-python3 tools/mechanics-report/new_report.py serve --slug jane-doe
-```
-
-## Layout
-
-- `templates/reports/_master/` — HTML + `serve.py` template
-- `templates/reports/<slug>/` — one athlete (stills, `notes.json`, HTML)
-- Cursor skill/rule: `.cursor/skills/mechanics-evaluation-report/`, `.cursor/rules/mechanics-evaluation-report.mdc`
-
-**NPA only.** Do not use Tom House language.
+The single shared server saves notes into the selected report directory. Upload the changed notes and report archive to Drive after each edit session. Preserve existing notes before a rebuild.

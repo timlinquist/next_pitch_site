@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import base64
 import json
 import mimetypes
@@ -17,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-MASTER = REPO / "templates" / "reports" / "_master"
+MASTER = Path(__file__).resolve().parent / "template"
 REPORTS = REPO / "templates" / "reports"
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
@@ -125,7 +126,7 @@ def score_candidate(phase: dict, image: Path) -> int:
     tokens = set(stem.split("-"))
     score = 0
     canonical = Path(phase["file"]).stem
-    if stem == canonical or image.name.lower() == phase["file"]:
+    if stem == canonical or stem.startswith(canonical + "-") or image.name.lower() == phase["file"]:
         return 100
     for number in phase["numbers"]:
         if stem == number or stem.startswith(number + "-"):
@@ -197,12 +198,14 @@ def find_free_port(start: int = 8765) -> int:
 
 
 def report_dir(slug: str) -> Path:
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug):
+        raise SystemExit("Use a slug with lowercase letters, digits, and hyphens")
     return REPORTS / slug
 
 
 def render_source(athlete: str, slug: str) -> str:
     master = (MASTER / "index.source.html").read_text(encoding="utf-8")
-    return master.replace("__ATHLETE_NAME__", athlete).replace("__ATHLETE_SLUG__", slug)
+    return master.replace("__ATHLETE_NAME__", html.escape(athlete)).replace("__ATHLETE_SLUG__", slug)
 
 
 def rewrite_still_refs(html: str, dest_names: dict[str, str]) -> str:
@@ -255,7 +258,7 @@ def cmd_create(args: argparse.Namespace) -> int:
 
     if not stills_dir.is_dir():
         raise SystemExit(f"Stills folder not found: {stills_dir}")
-    if not (MASTER / "index.source.html").exists() or not (MASTER / "serve.py").exists():
+    if not (MASTER / "index.source.html").exists():
         raise SystemExit(f"Master template missing under {MASTER}")
     if dest.exists() and not args.force:
         raise SystemExit(f"Report already exists: {dest}\nUse --force to rebuild stills/HTML (notes.json is kept).")
@@ -291,7 +294,6 @@ def cmd_create(args: argparse.Namespace) -> int:
     source_html = rewrite_still_refs(render_source(athlete, slug), dest_names)
     (dest / "index.source.html").write_text(source_html, encoding="utf-8")
     (dest / "index.html").write_text(embed_images(dest, source_html), encoding="utf-8")
-    shutil.copy2(MASTER / "serve.py", dest / "serve.py")
 
     notes_path = dest / "notes.json"
     if notes_path.exists() and args.force:
@@ -336,8 +338,8 @@ def cmd_create(args: argparse.Namespace) -> int:
     for phase in PHASES:
         print(f"  {phase['id']:16} {mapping[phase['id']].name} -> assets/{dest_names[phase['id']]}")
     print(f"Notes: {notes_path}")
-    print(f"Serve: python3 {dest / 'serve.py'}")
-    print(f"Or:    python3 {Path(__file__)} serve --slug {slug}")
+    print(f"Serve: python3 {Path(__file__).with_name('serve.py')} {dest}")
+    print(f"Or:    python3 {Path(__file__)} --reports-root {REPORTS} serve --slug {slug}")
     if args.serve:
         return cmd_serve(argparse.Namespace(slug=slug))
     return 0
@@ -356,7 +358,7 @@ def cmd_rebuild(args: argparse.Namespace) -> int:
 
 def cmd_list(_args: argparse.Namespace) -> int:
     rows = []
-    for folder in sorted(p for p in REPORTS.iterdir() if p.is_dir() and not p.name.startswith("_")):
+    for folder in sorted(p for p in (REPORTS.iterdir() if REPORTS.exists() else []) if p.is_dir() and not p.name.startswith("_")):
         meta = load_json(folder / "athlete.json") if (folder / "athlete.json").exists() else {}
         notes = load_json(folder / "notes.json") if (folder / "notes.json").exists() else {}
         name = meta.get("athlete") or notes.get("athlete") or folder.name
@@ -374,18 +376,19 @@ def cmd_list(_args: argparse.Namespace) -> int:
 
 def cmd_serve(args: argparse.Namespace) -> int:
     dest = report_dir(args.slug)
-    server = dest / "serve.py"
+    server = Path(__file__).with_name("serve.py")
     if not server.exists():
         raise SystemExit(f"No serve.py in {dest}. Create the report first.")
     index = dest / "index.html"
     if not index.exists() and (dest / "index.source.html").exists():
         cmd_rebuild(argparse.Namespace(slug=args.slug))
     print(f"Starting server for {args.slug}...")
-    return subprocess.call([sys.executable, str(server)], cwd=str(dest))
+    return subprocess.call([sys.executable, str(server), str(dest)], cwd=str(dest))
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="THE NEXT PITCH mechanics evaluation reports")
+    parser.add_argument("--reports-root", type=Path, help="External or ignored report directory; prefer a Drive-synced evals/date folder")
     sub = parser.add_subparsers(dest="command", required=True)
 
     create = sub.add_parser("create", help="Create a new athlete report from stills")
@@ -415,7 +418,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    global REPORTS
     args = build_parser().parse_args()
+    if args.reports_root:
+        REPORTS = args.reports_root.expanduser().resolve()
     return int(args.func(args) or 0)
 
 
