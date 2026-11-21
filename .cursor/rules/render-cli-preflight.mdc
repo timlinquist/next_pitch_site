@@ -1,0 +1,34 @@
+---
+description: Preflight check before any Render CLI command
+alwaysApply: true
+---
+
+# Render CLI Preflight
+
+Before running ANY `render` CLI command, read `~/.render/cli.yaml` and verify:
+
+1. **`workspace`** field exists and is non-empty
+2. **`api.key`** field exists and is non-empty
+3. **`api.expires_at`** is a Unix timestamp in the future (compare against current time via `date +%s`)
+
+If any check fails, STOP and tell the user:
+- If workspace is missing: "Run `render workspace set` in your terminal to select a workspace."
+- If api.key is missing or expires_at is in the past: "Run `render login` in your terminal to re-authenticate, then `render workspace set`."
+
+Do NOT attempt any `render` CLI command until all three checks pass.
+
+## Config file location
+`~/.render/cli.yaml`
+
+## Expected structure
+```yaml
+version: 1
+workspace: <workspace-id>
+workspace_name: <workspace-name>
+api:
+  key: <api-key>
+  expires_at: <unix-timestamp>
+  host: https://api.render.com/v1/
+  refreshtoken: <refresh-token>
+dashboard_url: https://dashboard.render.com
+```

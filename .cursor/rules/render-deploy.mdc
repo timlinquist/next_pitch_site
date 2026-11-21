@@ -1,0 +1,39 @@
+---
+description: Render.com deployment context for the Next Pitch app
+alwaysApply: true
+---
+
+# Render Deployment
+
+## Project Architecture
+Single Render Web Service (Docker) serving both the Go API and built Vite frontend.
+- **Repo**: timlinquist/next_pitch_site
+- **Deploy branch**: `render`
+- **Service ID**: `srv-d65uhnrnv86c73e04mk0`
+- **Workspace**: `tea-d65ttqsr85hc73d1uld0` (My Workspace)
+- **Dockerfile**: multi-stage at project root (Node build → Go build → Alpine runtime)
+- **Migrations**: run automatically on container startup via `./migrate -action up`
+
+## Render CLI
+
+Use `render` CLI for deployment tasks. Common commands:
+- `render services list` — list services
+- `render deploys list --service <service-id>` — list recent deploys
+- `render logs --service <service-id>` — tail live logs
+- `render deploys create --service <service-id>` — trigger manual deploy
+
+When debugging build/deploy failures, use `render logs` or `render deploys list` to fetch logs directly rather than asking the user to paste them.
+
+## Key Environment Variables on Render
+- `PORT` — set automatically by Render
+- `DATABASE_URL` — linked Render Postgres (internal URL)
+- `AUTH0_DOMAIN` — just the domain, no `https://` prefix (e.g. `dev-cx0z71mw7lq3og41.us.auth0.com`)
+- `VITE_AUTH0_CLIENT_DOMAIN`, `VITE_AUTH0_CLIENT_ID` — must have **Build** visibility (baked into JS at Docker build time)
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_S3_BUCKET`, `AWS_REGION`
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`
+
+## Relative Paths in Docker Container
+Working directory is `/app/backend`. All paths are relative to that:
+- Frontend dist: `../frontend/dist`
+- Email templates: `templates/email/`
+- DB migrations: `db/migrations/`

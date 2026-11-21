@@ -98,8 +98,8 @@ func NewEmailService() *EmailService {
 		"video_upload":       "video_upload.html",
 	}
 
-	// Set template directory path
-	templateDir := filepath.Join("..", "backend", "templates", "email")
+	// Set template directory path (relative to working directory, which is backend/)
+	templateDir := filepath.Join("templates", "email")
 	log.Printf("[Email] Loading templates from: %s", templateDir)
 
 	// List contents of template directory

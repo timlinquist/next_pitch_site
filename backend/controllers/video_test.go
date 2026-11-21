@@ -114,12 +114,7 @@ func setupTestController(t *testing.T) (*VideoController, *services.UserService,
 	// Create mock email service
 	mockEmail := &mockEmailService{}
 
-	// Mock environment loader that does nothing
-	mockEnvLoader := func(filenames ...string) error {
-		return nil
-	}
-
-	controller, err := NewVideoController(testDB, userService, mockEmail, mockEnvLoader)
+	controller, err := NewVideoController(testDB, userService, mockEmail)
 	assert.NoError(t, err)
 	assert.NotNil(t, controller)
 
