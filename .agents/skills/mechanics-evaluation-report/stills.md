@@ -21,4 +21,4 @@ Prefer canonical filenames in the stills folder. If names differ, the generator 
 --map balance=~/stills/a.jpg,lift=~/stills/b.jpg,thrust=~/stills/c.jpg,equal-opposite=~/stills/d.jpg,delayed=~/stills/e.jpg,swivel=~/stills/f.jpg,stack-track=~/stills/g.jpg,release-point=~/stills/h.jpg
 ```
 
-Portrait stills (lift, equal-opposite, swivel, stack-track) must display full frame. Do not crop with `object-fit: cover`.
+Preserve the full video frame in every still, including portrait camera views. Remove phone controls and black margins through report viewports after inspecting each image. Do not use a generic `object-fit: cover` crop that can cut off the athlete.

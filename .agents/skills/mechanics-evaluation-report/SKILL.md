@@ -36,8 +36,20 @@ python3 tools/mechanics-report/new_report.py --reports-root "/external/evals/202
 python3 tools/mechanics-report/new_report.py --reports-root "/external/evals/2026-11-20" serve --slug jane-doe
 ```
 
-The server binds to loopback and selects a free port. Read the printed URL. Validate all eight phase images, the athlete name, date, note load/save, and print layout. Keep phase images uncropped.
+The server binds to loopback and selects a free port. Read the printed URL. Validate all eight phase images, the athlete name, date, note load/save, and print layout. Preserve the complete delivery frame inside each image view; remove phone interface areas as described below.
 6. Upload `index.html`, `notes.json`, `athlete.json`, and an archive of the complete report directory to the verified Drive evaluation folder. The archive includes `index.source.html` and assets; it excludes server code. Verify uploaded file names and sizes through Drive readback. Record the source folder URL in the external athlete metadata. Give the user the verified Drive folder link.
+
+## Phone screenshots and final review
+
+Inspect every still before the first review. Phone screenshots often include black margins, status bars, playback buttons, and thumbnail strips. Crop the report view to the actual video frame. Preserve the athlete’s entire body, throwing hand, feet, mound, and useful field context. Keep original Drive files unchanged.
+
+Use non-destructive HTML/CSS image viewports for report crops. Determine bounds separately for every image from its actual dimensions and visible frame. Do not reuse fixed coordinates across phones, orientations, or camera views. A portrait camera view needs a portrait viewport; constrain its display size without cutting off the athlete. Apply the same crop to the cover still. Verify both screen and print CSS, especially rules that override image height or position.
+
+Wait for the user to finish the notes. Keep their editor tab and server open during entry and review. Never treat inactivity as completion. Read the saved notes after the user confirms completion.
+
+Create a separate standalone review HTML with the exact saved notes embedded in its markup, embedded images, approved crops, and hidden priorities removed. Remove editor scripts from this static copy so a server or browser storage cannot overwrite its notes. Preserve the editable report separately. Show the review before final publication when the user requests review.
+
+After approval, upload the reviewed static HTML as `index.html`, the latest `notes.json`, and the refreshed archive. Include the editable HTML as `editor.html`, plus source HTML and original assets. When reopening, use `editor.html` for note entry (or restore it as the local `index.html` first); regenerate the static final report after edits. Verify that the archive and standalone HTML use the same approved notes and crops.
 
 ## Edit and reopen
 
@@ -50,7 +62,7 @@ python3 tools/mechanics-report/new_report.py --reports-root /external/report reb
 
 The browser saves notes to the local report directory. Upload the latest notes and refreshed report archive after edits. A local save alone does not complete a Drive save. If Drive upload fails, retain the local report and report the failure. Do not claim that Drive contains it.
 
-Use the browser's Download PDF action for a final PDF. HTML alone does not preserve saved notes when opened without the shared server. Keep the JSON and archive beside it.
+Use the browser's Download PDF action for an editor PDF, or print the standalone final HTML. The static final HTML must include saved notes without the server. Keep the JSON and archive beside it.
 
 ## Completion
 
